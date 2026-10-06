@@ -219,3 +219,7 @@ comments on every cast -- demo mode, or `--repl` again.
 `example/simple_kv.py` rounds the set off with a 40-line `key=value` config
 parser: escaped-string and bare branches compete per field, with the metas
 riding in PEP 695 `type` aliases.
+
+## License
+
+MIT. See [`LICENSE.md`](LICENSE.md).

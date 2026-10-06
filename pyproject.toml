@@ -3,6 +3,11 @@ name = "infinity_parse"
 version = "0.1.1"
 description = "Type-safe, scanf-style string parsing."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.md"]
+authors = [
+    { name = "infinity_system: yin_bailiang" }
+]
 keywords = [
     "scanf",
     "parsing",
@@ -11,12 +16,15 @@ keywords = [
     "type-safe",
 ]
 classifiers = [
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing",
+    "Typing :: Typed",
 ]
 requires-python = ">=3.14"
 dependencies = []
@@ -33,6 +41,12 @@ dev = [
     "pre-commit",
     "infinity_parse[test]",
 ]
+
+[project.urls]
+Homepage = "https://github.com/yinbailiang/infinity_parse"
+Repository = "https://github.com/yinbailiang/infinity_parse"
+Issues = "https://github.com/yinbailiang/infinity_parse/issues"
+Changelog = "https://github.com/yinbailiang/infinity_parse/releases"
 
 [build-system]
 requires = ["uv_build>=0.11.21,<0.12.0"]
