@@ -1,6 +1,6 @@
 [project]
 name = "infinity_parse"
-version = "0.1.1"
+version = "0.1.2"
 description = "Type-safe, scanf-style string parsing."
 readme = "README.md"
 license = "MIT"
