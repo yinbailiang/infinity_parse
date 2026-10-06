@@ -28,33 +28,34 @@ Run it directly for a fixed demo, or with ``--repl`` to chat::
 """
 
 import sys
-from collections.abc import Callable
 from typing import Annotated
 
-from infinity_parse import Converter, MatchError, ScanError, scanf
+from infinity_parse import (
+    Converter,
+    MatchError,
+    Parser,
+    ScanError,
+    alt,
+    first_field,
+    recursive,
+    scan,
+)
 
 type Number = int | float
-type Parser = Callable[[str], Number]
 
 
 class MoeCalcError(ValueError):
     """The expression could not be parsed or evaluated -- said cutely."""
 
 
-# Competing branches on one field: plain digits stay int, decimal literals
-# fall through to the float branch. Branch order decides who wins.
-_number = scanf[
+# Competing branches: int digits first, float as fallback.
+_number = scan[
     Annotated[
         Number,
         Converter(int, pattern=r"\d+", name="整数"),
         Converter(float, pattern=r"\d+\.\d+", name="小数"),
     ]
 ]("{}")
-
-
-def warp_scanf[T, *Ts](s: scanf[T, *Ts]) -> Callable[[str], T]:
-    """Adapt a scanf parser into a plain ``Parser``: unwrap its first field."""
-    return lambda text: s(text)[0]
 
 
 def _rfind_binary(text: str, operators: str) -> int | None:
@@ -107,40 +108,10 @@ def _apply(operator: str, left: Number, right: Number) -> Number:
     raise AssertionError(f"unknown operator: {operator!r}")
 
 
-def recursive(builder: Callable[[Parser], Parser]) -> Parser:
-    """Fixpoint combinator: ``builder`` receives a thunk to the full parser."""
-
-    ref: Parser | None = None
-
-    def thunk(text: str) -> Number:
-        assert ref is not None
-        return ref(text)
-
-    parser = builder(thunk)
-    ref = parser
-    return parser
-
-
-def alt(*parsers: Parser) -> Parser:
-    """Ordered choice across parsers; only ``MatchError`` falls through."""
-
-    def parse(text: str) -> Number:
-        failure: MatchError | None = None
-        for parser in parsers:
-            try:
-                return parser(text)
-            except MatchError as error:
-                failure = error
-        raise MatchError(f"no alternative matched {text!r}") from failure
-
-    return parse
-
-
-def build_calc(self: Parser) -> Parser:
+def build_calc(self: Parser[Number]) -> Parser[Number]:
     """Build the ``expr`` level; ``self`` recurses into a whole expression."""
 
-    def parse_number(text: str) -> Number:
-        return _number(text)[0]
+    parse_number = first_field(_number)
 
     def parse_group(text: str) -> Number:
         inner = _inner_of_parens(text.strip())
@@ -152,11 +123,11 @@ def build_calc(self: Parser) -> Parser:
 
     parse_unary = recursive(
         lambda self: alt(
-            warp_scanf(scanf[Annotated[Number, Converter(fn=self)]]("+{}")),
-            warp_scanf(
-                scanf[Annotated[Number, Converter(fn=lambda text: -self(text))]]("-{}")
+            first_field(scan[Annotated[Number, Converter(fn=self)]]("+{}")),
+            first_field(
+                scan[Annotated[Number, Converter(fn=lambda text: -self(text))]]("-{}")
             ),
-            warp_scanf(scanf[Annotated[Number, Converter(fn=atom)]]("{}")),
+            first_field(scan[Annotated[Number, Converter(fn=atom)]]("{}")),
         )
     )
 
@@ -187,9 +158,7 @@ def moe_calc(expression: str) -> Number:
     try:
         return _calculate(expression)
     except ScanError as error:
-        # Sign/group branches convert through nested scans, so the engine
-        # upgrades any inner failure to ConvertError; recover the original
-        # MoeCalcError through __cause__ so nested cases stay cute too.
+        # Recover the original MoeCalcError through ``__cause__``.
         cause: BaseException | None = error.__cause__
         while cause is not None and not isinstance(cause, MoeCalcError):
             cause = cause.__cause__

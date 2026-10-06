@@ -20,7 +20,7 @@
    git branch
    ```
 
-2. **更新版本号** — 编辑 `pyproject.toml` 与 `src/infinity_parse/__init__.py` 中的版本字段，遵循 [SemVer](https://semver.org/lang/zh-CN/)：
+2. **更新版本号** — 编辑 `pyproject.toml` 中的版本字段（如项目在 `src/infinity_parse/__init__.py` 维护 `__version__`，一并更新），遵循 [SemVer](https://semver.org/lang/zh-CN/)：
 
    | 类型 | 场景 | 示例 |
    | - | - | - |

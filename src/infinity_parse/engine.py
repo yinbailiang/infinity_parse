@@ -1,13 +1,4 @@
-"""Runtime engine for :mod:`infinity_parse`: resolve field metas, then scan input.
-
-Two responsibilities, with no type-level semantics:
-
-* :func:`resolve_field` -- turn one field's meta (a bare declared converter
-  plus an optional :class:`Converter` spec) into a concrete converter configuration
-  (:class:`Field`);
-* :class:`Template` -- validate a configuration, compile the template regex
-  and ``scan`` input strings into tuples.
-"""
+"""Runtime engine for :mod:`infinity_parse`: resolve field metas, then scan input."""
 
 import ast
 import re
@@ -16,44 +7,32 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, get_origin
 
-# The default field pattern: non-empty, single-line (no DOTALL) and lazy.
+# Default capture pattern for "{}" fields.
+RE = re
 DEFAULT_PATTERN = r".+?"
-_PLACEHOLDER = "{}"
-_WHITESPACE = re.compile(r"\s+")
+PLACEHOLDER = "{}"
+WHITESPACE: RE.Pattern[str] = RE.compile(r"\s+")
 
 
 class ScanError(ValueError):
-    """Base failure while scanning: a ``MatchError`` or a ``ConvertError``."""
+    """Base class for scan failures."""
 
 
 class MatchError(ScanError):
-    """Input did not match the template (a soft failure).
-
-    Ordered-choice combinators fall through to the next alternative on this
-    one. A branch that matched but failed to convert raises ``ConvertError``
-    instead, which aborts the choice so its diagnostics are never swallowed.
-    """
+    """The input did not match the template (soft failure)."""
 
 
 class ConvertError(ScanError):
-    """A field matched but its converter failed (a hard failure).
-
-    The message carries the field number, the text and its offset; the
-    underlying error is chained through ``__cause__``.
-    """
+    """A field matched but its converter failed (hard failure)."""
 
 
 @dataclass(frozen=True)
 class Converter[T]:
-    """Per-field converter spec, passed as ``Annotated[T, Converter(...)]`` metadata.
+    """Per-field config for ``Annotated[T, Converter(...)]``.
 
-    ``fn`` converts the matched text; ``pattern`` is the regex used to capture
-    this field (inserted into the template regex as-is); ``strip`` strips the
-    matched text before conversion; ``name`` labels the field in error messages
-    (defaults to the callable's name); ``flags`` are ``re`` flags applied to
-    ``pattern``. Several specs on one field compete in declaration order: the
-    first branch whose pattern matches wins, and if its ``fn`` then raises, the
-    scan fails as a whole (no fallback to the remaining branches).
+    ``fn`` converts the captured text; ``pattern`` captures the field;
+    ``strip`` trims it first; ``name`` labels errors; ``flags`` are ``re``
+    flags applied to the pattern.
     """
 
     fn: Callable[[str], T]
@@ -65,7 +44,7 @@ class Converter[T]:
 
 @dataclass(frozen=True)
 class Field:
-    """One placeholder: converter branches competing in declaration order."""
+    """One ``{}`` placeholder: converter branches competing in order."""
 
     converters: tuple[Converter[Any], ...]
 
@@ -102,8 +81,7 @@ def _bool_converter(text: str) -> bool:
     return value
 
 
-# Keyed by the origin *object* (not by name), so user classes that happen to be
-# named ``dict``, ``list``, ``bool``, ... never pick up a built-in default.
+# Built-in defaults, keyed by type object (not by name).
 _BUILTIN_CONVERTERS: dict[object, Callable[[str], Any]] = {
     bool: _bool_converter,
     dict: _literal_converter(dict),
@@ -121,12 +99,7 @@ def _default_converter(converter: object) -> Callable[[str], Any] | None:
 
 
 def resolve_field(declared: Any, convs: list[Converter[Any]]) -> Field:
-    """Resolve one field's meta into its converter branches (meta -> converters).
-
-    User-provided ``Converter`` specs become the branches, in order. Without
-    any, one branch is synthesized from the declared type: the built-in default
-    for supported containers, otherwise the declared type used as a callable.
-    """
+    """Resolve one field's meta into its converter branches (meta -> converters)."""
     if convs:
         return Field(converters=tuple(convs))
     branch: Converter[Any] = Converter(
@@ -140,22 +113,22 @@ def _literal_to_pattern(text: str) -> str:
     """Escape literal template text; whitespace runs become ``\\s+``."""
     pieces: list[str] = []
     position = 0
-    for match in _WHITESPACE.finditer(text):
-        pieces.append(re.escape(text[position : match.start()]))
+    for match in WHITESPACE.finditer(text):
+        pieces.append(RE.escape(text[position : match.start()]))
         pieces.append(r"\s+")
         position = match.end()
-    pieces.append(re.escape(text[position:]))
+    pieces.append(RE.escape(text[position:]))
     return "".join(pieces)
 
 
 _INLINE_FLAGS: tuple[tuple[int, str], ...] = (
-    (re.IGNORECASE, "i"),
-    (re.MULTILINE, "m"),
-    (re.DOTALL, "s"),
-    (re.VERBOSE, "x"),
-    (re.ASCII, "a"),
+    (RE.IGNORECASE, "i"),
+    (RE.MULTILINE, "m"),
+    (RE.DOTALL, "s"),
+    (RE.VERBOSE, "x"),
+    (RE.ASCII, "a"),
 )
-_INLINE_FLAG_MASK = re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE | re.ASCII
+_INLINE_FLAG_MASK = RE.IGNORECASE | RE.MULTILINE | RE.DOTALL | RE.VERBOSE | RE.ASCII
 
 
 def _scoped(pattern: str, flags: int) -> str:
@@ -184,7 +157,7 @@ def _segments(template: str) -> tuple[str | None, ...]:
             if text.startswith("{{", position):
                 literal.append("{")
                 position += 2
-            elif text.startswith(_PLACEHOLDER, position):
+            elif text.startswith(PLACEHOLDER, position):
                 segments.append("".join(literal))
                 literal.clear()
                 segments.append(None)
@@ -229,7 +202,7 @@ def _field_chunk(index: int, field: Field) -> str:
 
 
 @lru_cache(maxsize=1024)
-def _compile(template: str, fields: tuple[Field, ...]) -> re.Pattern[str]:
+def _compile(template: str, fields: tuple[Field, ...]) -> RE.Pattern[str]:
     """Compile ``template`` into a regex with one named group per placeholder."""
     chunks: list[str] = []
     placeholder = 0
@@ -239,10 +212,10 @@ def _compile(template: str, fields: tuple[Field, ...]) -> re.Pattern[str]:
             placeholder += 1
         else:
             chunks.append(_literal_to_pattern(segment))
-    return re.compile("".join(chunks))
+    return RE.compile("".join(chunks))
 
 
-def _winner(match: re.Match[str], index: int, field: Field) -> int:
+def _winner(match: RE.Match[str], index: int, field: Field) -> int:
     """Index of the branch whose pattern produced the field's match."""
     if len(field.converters) == 1:
         return 0
@@ -256,7 +229,7 @@ class Template:
     """A validated, compiled template, ready to scan input."""
 
     def __init__(self, template: str, fields: tuple[Field, ...]) -> None:
-        # Fail fast on converters that cannot go into the compile cache.
+        # Validate up front: converters must be callable and hashable.
         hash(fields)
         for field in fields:
             if not field.converters:
@@ -274,15 +247,37 @@ class Template:
             )
         self.template = template
         self.fields = fields
-        self._pattern = _compile(template, fields)
+        self.pattern = _compile(template, fields)
 
-    def scan(self, input_value: str) -> tuple[Any, ...]:
+    def fullmatch(self, input_value: str) -> tuple[Any, ...]:
         """Scan ``input_value``: match the template and convert each field."""
-        match = self._pattern.fullmatch(input_value.strip())
+        match = self.pattern.fullmatch(input_value.strip())
         if match is None:
             raise MatchError(
                 f"input {input_value!r} does not match template {self.template!r}"
             )
+        # Report offsets against the original input.
+        shift = len(input_value) - len(input_value.lstrip())
+        return self._convert(match, input_value, shift)
+
+    def search(self, input_value: str) -> tuple[Any, ...] | None:
+        """Scan ``input_value`` for the first match; ``None`` when not found."""
+        match = self.pattern.search(input_value)
+        if match is None:
+            return None
+        return self._convert(match, input_value, 0)
+
+    def findall(self, input_value: str) -> list[tuple[Any, ...]]:
+        """Scan ``input_value`` for every non-overlapping match, left to right."""
+        return [
+            self._convert(match, input_value, 0)
+            for match in self.pattern.finditer(input_value)
+        ]
+
+    def _convert(
+        self, match: RE.Match[str], input_value: str, shift: int
+    ) -> tuple[Any, ...]:
+        """Convert one match's fields; ``shift`` maps offsets to the raw input."""
         values: list[Any] = []
         for index, field in enumerate(self.fields):
             converter = field.converters[_winner(match, index, field)]
@@ -291,8 +286,6 @@ class Template:
             try:
                 values.append(converter.fn(text))
             except Exception as error:
-                # Report the offset within the original input, not the stripped one.
-                shift = len(input_value) - len(input_value.lstrip())
                 offset = shift + match.start(f"s{index}")
                 raise ConvertError(
                     f"cannot convert field {index + 1} ({text!r}) at offset "

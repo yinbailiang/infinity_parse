@@ -1,7 +1,7 @@
 import json
 from typing import Annotated
 
-from infinity_parse import Converter, ScanError, scanf
+from infinity_parse import Converter, ScanError, scan
 
 _ESCAPED = r'"(?:[^"\\]|\\.)*"'
 
@@ -17,7 +17,7 @@ type Value = Annotated[
     Converter(str, pattern=r".*", name="bare value"),
 ]
 
-_line = scanf[Key, Value]("{}={}")
+_line = scan[Key, Value]("{}={}")
 
 
 def parse_kv(text: str) -> dict[str, str]:

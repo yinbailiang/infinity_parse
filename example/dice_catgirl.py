@@ -6,7 +6,7 @@ and reacts to every cast, from critical hits to slippery cat paws::
     uv run python example/dice_catgirl.py
     uv run python example/dice_catgirl.py --repl
 
-The three shapes (``NdM+K`` / ``NdM-K`` / ``NdM``) are three separate scanf
+The three shapes (``NdM+K`` / ``NdM-K`` / ``NdM``) are three separate ``scan``
 templates competing through an ordered ``alt`` choice, the bare ``NdM``
 catch-all last; only ``MatchError`` -- the soft failure -- falls through.
 In the REPL, ``?3d6+2`` forecasts the expected value and range instead of
@@ -16,10 +16,9 @@ dice.
 
 import random
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass
 
-from infinity_parse import MatchError, ScanError, scanf
+from infinity_parse import ScanError, alt, scan
 
 MAX_DICE = 100
 
@@ -56,9 +55,9 @@ class Roll:
         return f"{self.dice.count}d{self.dice.faces}{sign}"
 
 
-_plus = scanf[int, int, int]("{}d{}+{}")
-_minus = scanf[int, int, int]("{}d{}-{}")
-_plain = scanf[int, int]("{}d{}")
+_plus = scan[int, int, int]("{}d{}+{}")
+_minus = scan[int, int, int]("{}d{}-{}")
+_plain = scan[int, int]("{}d{}")
 
 
 def _plus_dice(text: str) -> Dice:
@@ -76,23 +75,7 @@ def _plain_dice(text: str) -> Dice:
     return Dice(count=count, faces=faces)
 
 
-def alt(*parsers: Callable[[str], Dice]) -> Callable[[str], Dice]:
-    """Ordered choice across parsers; only ``MatchError`` falls through."""
-
-    def choice(text: str) -> Dice:
-        failure: MatchError | None = None
-        for parser in parsers:
-            try:
-                return parser(text)
-            except MatchError as error:
-                failure = error
-        raise MatchError(f"no dice alternative matched {text!r}") from failure
-
-    return choice
-
-
-# The bare ``NdM`` catch-all must come last: its lazy fields would otherwise
-# swallow the modifier before the shaped parsers get a chance to compete.
+# Order matters: the bare ``NdM`` catch-all must come last.
 _read_dice = alt(_plus_dice, _minus_dice, _plain_dice)
 
 
