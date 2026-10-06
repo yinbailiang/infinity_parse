@@ -1,0 +1,74 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-ast
+      - id: check-toml
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: end-of-file-fixer
+        exclude: '\.py$'
+      - id: trailing-whitespace
+        exclude: '\.py$'
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.7
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+        files: ^(src|tests|example)/
+      - id: ruff-format
+        files: ^(src|tests|example)/
+
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.403
+    hooks:
+      - id: pyright
+        args: ["--level", "error"]
+        files: ^(src|tests|example)/
+
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.7.0
+    hooks:
+      - id: interrogate
+        files: ^src/
+
+  - repo: local
+    hooks:
+      - id: pytest-cov
+        name: pytest coverage
+        entry: uv run pytest --cov=infinity_parse --cov-fail-under=90 -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        types: [python]
+
+      - id: example-smoke
+        name: example smoke
+        entry: uv run python example/example.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: example-moe-smoke
+        name: moe_calc smoke
+        entry: uv run python example/moe_calc.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: dice-catgirl-smoke
+        name: dice_catgirl smoke
+        entry: uv run python example/dice_catgirl.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: simple-kv-smoke
+        name: simple_kv smoke
+        entry: uv run python example/simple_kv.py
+        language: system
+        pass_filenames: false
+        always_run: true

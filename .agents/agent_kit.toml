@@ -1,0 +1,33 @@
+# agent_kit 项目配置（由 agent-kit 生成；可手工微调，改动在下次 update 时生效）
+kit_version = 1
+
+[project]
+name = "infinity_parse"
+summary = "强类型、scanf 风格的字符串解析库（Python 3.14+）"
+package = "infinity_parse"
+src_dir = "src/infinity_parse"
+repo_url = "https://github.com/yinbailiang/infinity_parse"
+pypi_name = "infinity_parse"
+extra_sources = [
+  "example/example.py :: 可运行示例与验证入口",
+  "example/moe_calc.py :: moe_calc 计算器示例与验证入口",
+  "example/dice_catgirl.py :: 骰子猫娘示例与验证入口",
+  "example/simple_kv.py :: KV 解析器示例与验证入口",
+]
+
+[toolchain]
+setup = "uv sync --extra dev && uv run pre-commit install"
+lint = "uv run ruff check ."
+format = "uv run ruff format ."
+typecheck = "uv run pyright"
+test = "uv run pytest --cov=infinity_parse --cov-fail-under=90 -q"
+extras = [
+  "uv run interrogate src/infinity_parse/ :: 公开 API docstring 覆盖率检查",
+  "uv run python example/example.py :: 运行示例冒烟验证",
+  "uv run python example/moe_calc.py :: moe_calc 示例冒烟验证",
+  "uv run python example/dice_catgirl.py :: dice_catgirl 示例冒烟验证",
+  "uv run python example/simple_kv.py :: simple_kv 示例冒烟验证",
+]
+
+[skills]
+enabled = ["modify-core-api", "pre-commit-check", "write-tests", "write-docs", "write-skill", "publish"]

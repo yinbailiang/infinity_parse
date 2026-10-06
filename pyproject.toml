@@ -1,0 +1,83 @@
+[project]
+name = "infinity_parse"
+version = "0.1.1"
+description = "Type-safe, scanf-style string parsing."
+readme = "README.md"
+keywords = [
+    "scanf",
+    "parsing",
+    "parser",
+    "regex",
+    "type-safe",
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing",
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+dev = [
+    "interrogate",
+    "ruff",
+    "pyright",
+    "pre-commit",
+    "infinity_parse[test]",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.21,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "E",   # pycodestyle (errors)
+    "F",   # pyflakes
+    "I",   # isort
+    "RUF", # Ruff-specific rules
+    "SIM", # flake8-simplify
+    "UP",  # pyupgrade
+    "W",   # pycodestyle (warnings)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["infinity_parse"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.14"
+venvPath = "."
+venv = ".venv"
+
+[tool.interrogate]
+fail-under = 90
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+ignore-private = true
+ignore-semiprivate = true
+ignore-nested-functions = true
+exclude = ["tests", "example"]
+
+[tool.uv.build-backend]
+module-root = "src"
+module-name = "infinity_parse"
