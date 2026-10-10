@@ -40,6 +40,9 @@ type Value = Annotated[
 type FloatDigits = Annotated[
     float, Converter(float, pattern=r"\d+\.\d+", name="float-digits")
 ]
+# Plain-assignment alias (not a ``type`` alias): merged specs must still be
+# rejected as multiple bare specs.
+assigned_digits = Annotated[int, Converter(int, pattern=r"\d+", name="assigned")]
 
 
 class Hex:
@@ -387,8 +390,17 @@ def test_literal_nesting_collapses_into_one_layer() -> None:
 
 
 def test_alias_converter_specs_cannot_be_wrapped() -> None:
-    with pytest.raises(ValueError, match="nested Annotated layers"):
+    # Through a ``type`` alias the layers stay visible, but the merged specs
+    # are still rejected -- by the single-layer check.
+    with pytest.raises(ValueError, match="multiple Converter specs"):
         scan[Annotated[Digits, Converter(lambda raw: raw, name="outer")]]("{}")
+
+
+def test_assignment_alias_with_outer_spec_is_rejected() -> None:
+    # A plain-assignment alias is collapsed by ``typing``; the merged specs
+    # must still be rejected, so no spelling slips through.
+    with pytest.raises(ValueError, match="multiple Converter specs"):
+        scan[Annotated[assigned_digits, Converter(str, name="outer")]]("{}")
 
 
 def test_pep695_alias_meta_expands_like_inline() -> None:

@@ -82,22 +82,13 @@ def _has_spec(items: Iterable[Any]) -> bool:
 
 
 def flatten_annotated(meta: Any) -> tuple[Any, list[Any]]:
-    """Flatten nested ``Annotated`` wrappers and PEP 695 aliases.
-
-    An ``Annotated`` adding specs on top of an alias that already carries
-    them is rejected: an outer layer cannot override an inner one.
-    """
+    """Flatten nested ``Annotated`` wrappers and PEP 695 aliases."""
     if isinstance(meta, TypeAliasType):
         return flatten_annotated(meta.__value__)
     if get_origin(meta) is not Annotated:
         return meta, []
     args = get_args(meta)
     base, metadata = flatten_annotated(args[0])
-    if _has_spec(metadata) and _has_spec(args[1:]):
-        raise ValueError(
-            "Converter specs on multiple nested Annotated layers; pack "
-            "competing branches in OneOf[*Converter] instead"
-        )
     return base, [*metadata, *args[1:]]
 
 

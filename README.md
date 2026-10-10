@@ -113,9 +113,9 @@ parse_number("3.14")  # (3.14,)
 Specs on an `Annotated` wrapping the whole union bind it as one branch group;
 combining them with specs on the members is a construction-time error.
 
-**Declare converter aliases with the PEP 695 `type` statement.** Aliases are
-expanded at runtime exactly as type checkers expand them statically — chains
-included, and plain aliases (`type MyInt = int`) pass through as well:
+Converters can also travel in a PEP 695 `type` alias; aliases are expanded at
+runtime exactly as type checkers expand them statically — chains included, and
+plain aliases (`type MyInt = int`) pass through as well:
 
 ```python
 from typing import Annotated
@@ -127,18 +127,12 @@ type Age = Annotated[int, Converter(int, pattern=r"\d+", name="age")]
 scan[Age]("{}")("42")  # (42,)
 ```
 
-A plain assignment (`Age = Annotated[int, ...]`) works the same on its own,
-but it **is** the `Annotated` object: `typing` collapses any `Annotated`
-wrapping it into one layer before this library sees it, so mixed layers like
-`Annotated[Age, C2]` go undetected — the very trap the checks below exist to
-catch. **Always use the `type` statement for aliases that carry converters.**
-
 ### Specs must sit on one layer
 
 **All branches of a field must sit on one `Annotated` layer, packed in a
 single `OneOf`.** An outer layer cannot override an inner one, and specs
-hidden inside a `type` alias are usually invisible at the call site — so
-mixing specs across layers is rejected at construction time:
+hidden inside an alias are usually invisible at the call site — so mixing
+specs across layers is rejected at construction time:
 
 ```python
 from typing import Annotated
@@ -149,8 +143,8 @@ type Age = Annotated[int, Converter(int, pattern=r"\d+", name="age")]
 
 scan[Age]("{}")("42")  # (42,)
 scan[Annotated[Age, Converter(int, name="outer")]]("{}")
-# ValueError: Converter specs on multiple nested Annotated layers; pack
-#   competing branches in OneOf[*Converter] instead
+# ValueError: multiple Converter specs on one field; pack competing branches
+#   in OneOf[*Converter], e.g. Annotated[T, OneOf[C1, C2]]
 ```
 
 The same rule rejects specs on an `Annotated` wrapping a union together with
