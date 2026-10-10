@@ -318,6 +318,17 @@ def test_multiple_bare_specs_are_rejected() -> None:
         ]("{}")
 
 
+def test_oneof_mixed_with_bare_spec_is_rejected() -> None:
+    with pytest.raises(ValueError, match="multiple Converter specs"):
+        scan[
+            Annotated[
+                int,
+                Converter(int, pattern=r"\d+"),
+                OneOf[Converter(str, name="word")],
+            ]
+        ]("{}")
+
+
 def test_oneof_validation() -> None:
     with pytest.raises(TypeError, match="Converter instances"):
         OneOf[Digits]
@@ -548,6 +559,22 @@ def test_union_member_keeps_its_multiple_specs_grouped() -> None:
     assert parse("42") == ("digits",)
     assert parse("42x") == ("suffixed",)
     assert parse("ab") == ("word",)
+
+
+def test_union_of_oneof_members_expands_in_member_order() -> None:
+    parse = scan[
+        Annotated[
+            str,
+            OneOf[
+                Converter(lambda raw: "a", pattern=r"\d+"),
+                Converter(lambda raw: "b", pattern=r"[a-z]+"),
+            ],
+        ]
+        | Annotated[str, OneOf[Converter(lambda raw: "c", pattern=r"[A-Z]+")]]
+    ]("{}")
+    assert parse("42") == ("a",)
+    assert parse("abc") == ("b",)
+    assert parse("ABC") == ("c",)
 
 
 def test_oneof_binds_a_union_field_as_one_group() -> None:
