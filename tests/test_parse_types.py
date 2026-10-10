@@ -3,12 +3,15 @@
 import math
 from datetime import UTC, date, datetime, time, timedelta, timezone
 from decimal import Decimal
-from typing import Any, assert_type, cast
+from typing import Any, Literal, assert_type, cast
 
 import pytest
 
 from infinity_parse import ConvertError, MatchError, scan, scanall
 from infinity_parse import parse_types as t
+
+# PEP 695 aliases must be at module scope (pyright rule).
+type DashPair = t.RegexString[Literal[r"\d+-\d+"]]
 
 CASES: list[tuple[str, Any, str, Any]] = [
     ("letters", t.Letters, "abcXYZ", "abcXYZ"),
@@ -150,5 +153,23 @@ def test_invalid_values_raise_scan_error() -> None:
 def test_result_types_are_inferred() -> None:
     assert_type(scan[t.Int]("{}")("42"), tuple[int])
     assert_type(scan[t.Int, t.Percent]("{} {}")("1 12.5%"), tuple[int, float])
+
+
+def test_regex_string_builds_a_converter_from_a_literal() -> None:
+    parse = scan[DashPair]("{}")
+    result = parse("12-34")
+    assert_type(result, tuple[DashPair])
+    assert result == ("12-34",)
+    member: str = result[0]
+    assert member.upper() == "12-34"
+    with pytest.raises(MatchError):
+        parse("abc")
+
+
+def test_regex_string_rejects_non_literal_patterns() -> None:
+    with pytest.raises(TypeError, match="Literal"):
+        t.RegexString[str]
+    with pytest.raises(TypeError, match="Literal"):
+        t.RegexString[Literal[1]]
     assert_type(scan[t.SimpleDate]("{}")("2024-01-15"), tuple[date])
     assert_type(scan[t.AmPmTime]("{}")("10:21 PM"), tuple[time])

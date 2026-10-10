@@ -193,6 +193,21 @@ scan[t.Percent]("{}")("12.5%")  # (0.125,)
 scan[t.AmPmTime]("{}")("10:21:36 PM")  # (time(22, 21, 36),)
 ```
 
+For a one-off shape, build a type from a literal pattern with
+`t.RegexString` — it resolves to an `Annotated` converter at runtime, while
+type checkers see a `str` subtype:
+
+```python
+from typing import Literal
+
+from infinity_parse import scan
+from infinity_parse.parse_types import RegexString
+
+type DashPair = RegexString[Literal[r"\d+-\d+"]]
+
+scan[DashPair]("{}")("12-34")  # ('12-34',)
+```
+
 The set covers character classes (`t.Letters`, `t.Word`, ...), ISO 8601 /
 RFC 2822 / ctime / HTTP-log / syslog date-times, thousands-separated integers
 (`t.CommaInt`), percents, hexadecimal / binary / octal integers, floats and

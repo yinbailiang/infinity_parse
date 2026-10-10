@@ -3,7 +3,7 @@
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
-from typing import Annotated
+from typing import Annotated, Any, get_args
 
 from .engine import RE, Converter
 
@@ -27,6 +27,7 @@ __all__: list[str] = [
     "NonWord",
     "Octal",
     "Percent",
+    "RegexString",
     "Rfc2822DateTime",
     "SimpleDate",
     "SimpleTime",
@@ -428,3 +429,22 @@ type DecimalNumber = Annotated[
     Converter(Decimal, pattern=r"[+-]?(?:\d+\.\d+|\.\d+)", name="DecimalNumber"),
 ]
 # 1.5 -> decimal.Decimal;对应 parse 的 {:F}。
+
+
+class RegexString[P](str):
+    r"""User-defined ``str`` type built from a literal pattern.
+
+    ``RegexString[Literal[r"\d+-\d+"]]`` resolves at runtime to
+    ``Annotated[str, Converter(str, pattern=...)]``, while type checkers see
+    a ``str`` subtype carrying the pattern as ``P``.
+    """
+
+    @classmethod
+    def __class_getitem__(cls, item: Any) -> Any:
+        args = get_args(item)
+        if len(args) != 1 or not isinstance(args[0], str):
+            raise TypeError(
+                "RegexString requires a single Literal pattern, e.g. "
+                'RegexString[Literal[r"\\d+"]]'
+            )
+        return Annotated[str, Converter(str, pattern=args[0], name="RegexString")]
