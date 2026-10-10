@@ -12,6 +12,7 @@ __all__: list[str] = [
     "Binary",
     "CommaInt",
     "CtimeDateTime",
+    "DateTime",
     "DecimalNumber",
     "ExponentFloat",
     "Float",
@@ -448,3 +449,76 @@ class RegexString[P](str):
                 'RegexString[Literal[r"\\d+"]]'
             )
         return Annotated[str, Converter(str, pattern=args[0], name="RegexString")]
+
+
+# strptime 指令 -> 字段捕获正则(常用子集,捕获模式不带命名组)。
+_STRPTIME_SPECS = {
+    "a": r"[A-Za-z]{3}",
+    "A": r"[A-Za-z]+",
+    "b": r"[A-Za-z]{3}",
+    "B": r"[A-Za-z]+",
+    "d": r"\d{1,2}",
+    "f": r"\d{1,6}",
+    "H": r"\d{1,2}",
+    "I": r"\d{1,2}",
+    "j": r"\d{1,3}",
+    "m": r"\d{1,2}",
+    "M": r"\d{2}",
+    "p": r"[AaPp][Mm]",
+    "S": r"\d{2}",
+    "y": r"\d{2}",
+    "Y": r"\d{4}",
+    "z": r"[+-]\d{2}:?\d{2}",
+    "Z": r"[A-Za-z]+",
+    "%": "%",
+}
+
+
+def _strptime_pattern(fmt: str) -> str:
+    """把 strptime 格式串翻成字段捕获正则(空白宽容匹配)。"""
+    pieces: list[str] = []
+    index = 0
+    while index < len(fmt):
+        character = fmt[index]
+        if character == "%":
+            if index + 1 >= len(fmt):
+                raise ValueError("trailing %")
+            spec = fmt[index + 1]
+            piece = _STRPTIME_SPECS.get(spec)
+            if piece is None:
+                raise ValueError(f"unsupported directive %{spec}")
+            pieces.append(piece)
+            index += 2
+        else:
+            pieces.append(r"\s+" if character.isspace() else RE.escape(character))
+            index += 1
+    return "".join(pieces)
+
+
+class DateTime[F](datetime):
+    r"""User-defined ``datetime`` type from a literal strptime format.
+
+    ``DateTime[Literal["%Y-%m-%d %H:%M:%S"]]`` resolves at runtime to
+    ``Annotated[datetime, Converter(...)]``; the capture pattern is derived
+    from a common subset of strptime directives, and unsupported directives
+    raise ``TypeError`` at construction.
+    """
+
+    @classmethod
+    def __class_getitem__(cls, item: Any) -> Any:
+        args = get_args(item)
+        if len(args) != 1 or not isinstance(args[0], str):
+            raise TypeError(
+                "DateTime requires a single Literal format, e.g. "
+                'DateTime[Literal["%Y-%m-%d"]]'
+            )
+        fmt = args[0]
+        try:
+            pattern = _strptime_pattern(fmt)
+        except ValueError as error:
+            raise TypeError(f"DateTime format {fmt!r}: {error}") from error
+
+        def convert(text: str) -> datetime:
+            return datetime.strptime(text, fmt)
+
+        return Annotated[datetime, Converter(convert, pattern=pattern, name="DateTime")]

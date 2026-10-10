@@ -208,6 +208,21 @@ type DashPair = RegexString[Literal[r"\d+-\d+"]]
 scan[DashPair]("{}")("12-34")  # ('12-34',)
 ```
 
+The same idea carries `strptime` formats through `t.DateTime` — the capture
+pattern is derived from the format's directives:
+
+```python
+from typing import Literal
+
+from infinity_parse import scan
+from infinity_parse.parse_types import DateTime
+
+type LogStamp = DateTime[Literal["%Y-%m-%d %H:%M:%S"]]
+
+scan[LogStamp]("{}")("2024-01-15 12:30:45")
+# (datetime(2024, 1, 15, 12, 30, 45),)
+```
+
 The set covers character classes (`t.Letters`, `t.Word`, ...), ISO 8601 /
 RFC 2822 / ctime / HTTP-log / syslog date-times, thousands-separated integers
 (`t.CommaInt`), percents, hexadecimal / binary / octal integers, floats and

@@ -12,6 +12,7 @@ from infinity_parse import parse_types as t
 
 # PEP 695 aliases must be at module scope (pyright rule).
 type DashPair = t.RegexString[Literal[r"\d+-\d+"]]
+type LogStamp = t.DateTime[Literal["%Y-%m-%d %H:%M:%S"]]
 
 CASES: list[tuple[str, Any, str, Any]] = [
     ("letters", t.Letters, "abcXYZ", "abcXYZ"),
@@ -171,5 +172,23 @@ def test_regex_string_rejects_non_literal_patterns() -> None:
         t.RegexString[str]
     with pytest.raises(TypeError, match="Literal"):
         t.RegexString[Literal[1]]
+
+
+def test_datetime_builds_a_converter_from_a_literal_format() -> None:
+    parse = scan[LogStamp]("{}")
+    result = parse("2024-01-15 12:30:45")
+    assert_type(result, tuple[LogStamp])
+    assert result == (datetime(2024, 1, 15, 12, 30, 45),)
+    with pytest.raises(MatchError):
+        parse("oops")
+    with pytest.raises(ConvertError):
+        parse("2024-13-45 99:99:99")
+
+
+def test_datetime_rejects_bad_formats() -> None:
+    with pytest.raises(TypeError, match="Literal"):
+        t.DateTime[str]
+    with pytest.raises(TypeError, match="unsupported"):
+        t.DateTime[Literal["%Q"]]
     assert_type(scan[t.SimpleDate]("{}")("2024-01-15"), tuple[date])
     assert_type(scan[t.AmPmTime]("{}")("10:21 PM"), tuple[time])
