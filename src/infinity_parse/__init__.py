@@ -16,6 +16,7 @@ from infinity_parse.engine import (
     Template,
 )
 from infinity_parse.scanner import (
+    OneOf,
     Scanner,
     resolve_field,
     scan,
@@ -27,6 +28,7 @@ __all__: list[str] = [
     "ConvertError",
     "Converter",
     "MatchError",
+    "OneOf",
     "Parser",
     "ScanError",
     "Scanner",

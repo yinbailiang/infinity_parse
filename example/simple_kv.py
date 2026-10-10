@@ -1,20 +1,24 @@
 import json
 from typing import Annotated
 
-from infinity_parse import Converter, ScanError, scan
+from infinity_parse import Converter, OneOf, ScanError, scan
 
 _ESCAPED = r'"(?:[^"\\]|\\.)*"'
 
 type Key = Annotated[
     str,
-    Converter(json.loads, pattern=_ESCAPED, name="escaped key"),
-    Converter(str, pattern=r"[^=\s]+", name="bare key"),
+    OneOf[
+        Converter(json.loads, pattern=_ESCAPED, name="escaped key"),
+        Converter(str, pattern=r"[^=\s]+", name="bare key"),
+    ],
 ]
 
 type Value = Annotated[
     str,
-    Converter(json.loads, pattern=_ESCAPED, name="escaped value"),
-    Converter(str, pattern=r".*", name="bare value"),
+    OneOf[
+        Converter(json.loads, pattern=_ESCAPED, name="escaped value"),
+        Converter(str, pattern=r".*", name="bare value"),
+    ],
 ]
 
 parse_line = scan[Key, Value]("{} = {}")

@@ -65,12 +65,33 @@ parse('age=42 name="kim"')  # (42, '"kim"')
 ```
 
 `typing.Annotated` wrappers around converters are stripped; their metadata is
-ignored unless it contains a `Converter` spec. Several specs on one field
-compete in declaration order: each branch carries its own pattern, the first
-branch whose pattern matches wins, and if its converter then fails the whole
-scan fails — a failing converter never falls back to a later branch. **All
-branches must sit on one `Annotated` layer** — mixing specs across layers is
-rejected; see [Specs must sit on one layer](#specs-must-sit-on-one-layer).
+ignored unless it contains a `Converter` spec. Competing branches are packed
+explicitly in `OneOf`: each branch carries its own pattern, the first branch
+whose pattern matches wins, and if its converter then fails the whole scan
+fails — a failing converter never falls back to a later branch:
+
+```python
+from typing import Annotated
+
+from infinity_parse import Converter, OneOf, scan
+
+parse_number = scan[
+    Annotated[
+        int | float,
+        OneOf[
+            Converter(int, pattern=r"\d+"),
+            Converter(float, pattern=r"\d+\.\d+"),
+        ],
+    ]
+]("{}")
+parse_number("42")  # (42,)
+parse_number("3.14")  # (3.14,)
+```
+
+Bare multiple `Converter` specs on one field are rejected: **all branches
+must sit on one `Annotated` layer and be packed in a single `OneOf`** —
+mixing specs across layers is rejected too, see
+[Specs must sit on one layer](#specs-must-sit-on-one-layer).
 
 A `|` union of annotated members is sugar for the same competition: each
 member becomes one branch group in member order, and a member without a
@@ -114,10 +135,10 @@ catch. **Always use the `type` statement for aliases that carry converters.**
 
 ### Specs must sit on one layer
 
-**All branches of a field must be declared on a single `Annotated` layer.**
-An outer layer cannot override an inner one, and specs hidden inside a `type`
-alias are usually invisible at the call site — so mixing specs across layers
-is rejected at construction time:
+**All branches of a field must sit on one `Annotated` layer, packed in a
+single `OneOf`.** An outer layer cannot override an inner one, and specs
+hidden inside a `type` alias are usually invisible at the call site — so
+mixing specs across layers is rejected at construction time:
 
 ```python
 from typing import Annotated
@@ -128,8 +149,8 @@ type Age = Annotated[int, Converter(int, pattern=r"\d+", name="age")]
 
 scan[Age]("{}")("42")  # (42,)
 scan[Annotated[Age, Converter(int, name="outer")]]("{}")
-# ValueError: Converter specs on multiple nested Annotated layers; declare
-#   all branches on a single layer, e.g. Annotated[T, C1, C2]
+# ValueError: Converter specs on multiple nested Annotated layers; pack
+#   competing branches in OneOf[*Converter] instead
 ```
 
 The same rule rejects specs on an `Annotated` wrapping a union together with
@@ -263,14 +284,15 @@ coverage), pytest with a coverage floor, and an `example/` smoke run. CI
 `example/example.py` contains worked examples: field customization, JSON
 parsing and a recursive scanner built with the library combinators
 (`recursive` / `sep_by`). `example/moe_calc.py` is a cute four-function
-calculator built the same way -- its number field competes `int` and `float`
-converter branches; run it for a demo, or add `--repl` to chat interactively.
+calculator built the same way -- its number field packs `int` and `float`
+converter branches in `OneOf`; run it for a demo, or add `--repl` to chat
+interactively.
 `example/dice_catgirl.py` is its dice-rolling companion: it reads tabletop
 notation (`3d6+2`), forecasts odds for a `?`-prefixed expression, and
 comments on every cast -- demo mode, or `--repl` again.
 `example/simple_kv.py` rounds the set off with a 40-line `key=value` config
-parser: escaped-string and bare branches compete per field, with the metas
-riding in PEP 695 `type` aliases.
+parser: escaped-string and bare branches are packed in `OneOf` per field,
+with the metas riding in PEP 695 `type` aliases.
 
 ## License
 

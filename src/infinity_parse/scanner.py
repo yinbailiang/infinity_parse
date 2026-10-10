@@ -16,6 +16,7 @@ project README for the full guide -- usage, semantics and examples.
 import ast
 import types
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from typing import Annotated, Any, TypeAliasType, cast, get_args, get_origin
 
 from infinity_parse.engine import (
@@ -31,6 +32,7 @@ __all__: list[str] = [
     "ConvertError",
     "Converter",
     "MatchError",
+    "OneOf",
     "ScanError",
     "Scanner",
     "resolve_field",
@@ -40,9 +42,43 @@ __all__: list[str] = [
 ]
 
 
-def _has_converter(items: Iterable[Any]) -> bool:
-    """Whether ``items`` contains at least one ``Converter``."""
-    return any(isinstance(item, Converter) for item in items)
+@dataclass(frozen=True, repr=False)
+class _OneOfSpec:
+    """The runtime value of ``OneOf[...]``: competing converter branches."""
+
+    converters: tuple[Converter[Any], ...]
+
+    def __repr__(self) -> str:
+        inner = ", ".join(repr(converter) for converter in self.converters)
+        return f"OneOf[{inner}]"
+
+
+class OneOf:
+    """Packs competing ``Converter`` branches into one field spec.
+
+    ``Annotated[T, OneOf[C1, C2]]`` competes the packed branches in
+    declaration order; bare multiple ``Converter`` specs are rejected.
+    """
+
+    def __init__(self) -> None:
+        # Built through subscription (``OneOf[C1, C2]``); calling directly is misuse.
+        raise TypeError("OneOf is used through subscription: OneOf[C1, C2]")
+
+    @classmethod
+    def __class_getitem__(cls, item: Any) -> _OneOfSpec:
+        """Pack the given ``Converter`` instances; called by ``OneOf[...]``."""
+        converters = cast(tuple[Any, ...], item if isinstance(item, tuple) else (item,))
+        if not converters:
+            raise TypeError("OneOf requires at least one Converter")
+        for converter in converters:
+            if not isinstance(converter, Converter):
+                raise TypeError(f"OneOf accepts Converter instances, got {converter!r}")
+        return _OneOfSpec(converters=tuple(converters))
+
+
+def _has_spec(items: Iterable[Any]) -> bool:
+    """Whether ``items`` contains a spec (a ``Converter`` or a ``OneOf``)."""
+    return any(isinstance(item, Converter | _OneOfSpec) for item in items)
 
 
 def flatten_annotated(meta: Any) -> tuple[Any, list[Any]]:
@@ -57,10 +93,10 @@ def flatten_annotated(meta: Any) -> tuple[Any, list[Any]]:
         return meta, []
     args = get_args(meta)
     base, metadata = flatten_annotated(args[0])
-    if _has_converter(metadata) and _has_converter(args[1:]):
+    if _has_spec(metadata) and _has_spec(args[1:]):
         raise ValueError(
-            "Converter specs on multiple nested Annotated layers; declare "
-            "all branches on a single layer, e.g. Annotated[T, C1, C2]"
+            "Converter specs on multiple nested Annotated layers; pack "
+            "competing branches in OneOf[*Converter] instead"
         )
     return base, [*metadata, *args[1:]]
 
@@ -139,11 +175,30 @@ def _join_union(members: list[Any]) -> Any:
 
 
 def _has_specs(meta: Any) -> bool:
-    """Whether ``meta`` carries explicit ``Converter`` specs (defaults excluded)."""
+    """Whether ``meta`` carries explicit specs (default branches excluded)."""
     base, metadata = flatten_annotated(meta)
-    if _has_converter(metadata):
+    if _has_spec(metadata):
         return True
     return _is_union(base) and any(_has_specs(member) for member in get_args(base))
+
+
+def _collect_specs(metadata: Iterable[Any]) -> list[Converter[Any]]:
+    """Collect one layer's branches: one ``Converter`` or one ``OneOf``."""
+    converters: list[Converter[Any]] = []
+    specs = 0
+    for item in metadata:
+        if isinstance(item, Converter):
+            specs += 1
+            converters.append(cast(Converter[Any], item))
+        elif isinstance(item, _OneOfSpec):
+            specs += 1
+            converters.extend(item.converters)
+    if specs > 1:
+        raise ValueError(
+            "multiple Converter specs on one field; pack competing branches "
+            "in OneOf[*Converter], e.g. Annotated[T, OneOf[C1, C2]]"
+        )
+    return converters
 
 
 def normalize_meta(meta: Any) -> tuple[Any, list[Converter[Any]]]:
@@ -153,12 +208,10 @@ def normalize_meta(meta: Any) -> tuple[Any, list[Converter[Any]]]:
     with ``[C1, C2]``; members without specs contribute a default branch.
     Specs on an ``Annotated`` wrapping the whole union bind it as one branch
     group, unless members carry their own specs (rejected as ambiguous).
-    Non-``Converter`` metadata is ignored.
+    Competing branches must be packed in ``OneOf``; other metadata is ignored.
     """
     base, metadata = flatten_annotated(meta)
-    convs: list[Converter[Any]] = [
-        cast(Converter[Any], item) for item in metadata if isinstance(item, Converter)
-    ]
+    convs = _collect_specs(metadata)
     if not _is_union(base):
         return base, convs
     if convs:

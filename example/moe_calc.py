@@ -9,7 +9,7 @@ The grammar is the classic four-function one::
 
 Four scanf-flavoured pieces carry the parser:
 
-* number leaves use competing ``Converter`` branches on one field -- ``int``
+* number leaves pack competing ``Converter`` branches in ``OneOf`` -- ``int``
   for plain digits, ``float`` for decimal literals, first match wins;
 * ``atom`` alternatives (parenthesized group vs plain number) are an ordered
   ``alt`` choice, where only ``MatchError`` -- the soft failure -- falls
@@ -33,6 +33,7 @@ from typing import Annotated
 from infinity_parse import (
     Converter,
     MatchError,
+    OneOf,
     Parser,
     ScanError,
     alt,
@@ -48,12 +49,14 @@ class MoeCalcError(ValueError):
     """The expression could not be parsed or evaluated -- said cutely."""
 
 
-# Competing branches: int digits first, float as fallback.
+# Competing branches packed in OneOf: int digits first, float as fallback.
 _number = scan[
     Annotated[
         Number,
-        Converter(int, pattern=r"\d+", name="整数"),
-        Converter(float, pattern=r"\d+\.\d+", name="小数"),
+        OneOf[
+            Converter(int, pattern=r"\d+", name="整数"),
+            Converter(float, pattern=r"\d+\.\d+", name="小数"),
+        ],
     ]
 ]("{}")
 

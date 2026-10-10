@@ -8,6 +8,7 @@ from typing import Annotated, Any
 
 from infinity_parse import (
     Converter,
+    OneOf,
     Parser,
     ScanError,
     first_field,
@@ -34,12 +35,14 @@ parse_json = scan[Annotated[dict[str, str], Converter[dict[str, str]](json.loads
 print(parse_json('{"key": "value"}'))  # ({"key": "value"},)
 
 
-# Competing branches: first match wins; failures abort the scan.
+# Competing branches are packed in OneOf: first match wins; failures abort.
 parse_number = scan[
     Annotated[
         int | float,
-        Converter(int, pattern=r"[-+]?\d+"),
-        Converter(float, pattern=r"[-+]?\d+\.\d+"),
+        OneOf[
+            Converter(int, pattern=r"[-+]?\d+"),
+            Converter(float, pattern=r"[-+]?\d+\.\d+"),
+        ],
     ]
 ]("{}")
 print(parse_number("42"))  # (42,)
@@ -83,9 +86,11 @@ def build_node(self: Parser[Any]) -> Parser[Any]:
     node = scan[
         Annotated[
             Any,
-            Converter(to_object, pattern=r"\{.+\}", name="object"),
-            Converter(to_array, pattern=r"\[.+\]", name="array"),
-            Converter(to_atom, pattern=r"^\w+$", name="atom"),
+            OneOf[
+                Converter(to_object, pattern=r"\{.+\}", name="object"),
+                Converter(to_array, pattern=r"\[.+\]", name="array"),
+                Converter(to_atom, pattern=r"^\w+$", name="atom"),
+            ],
         ]
     ]("{}")
 
@@ -114,16 +119,18 @@ class SomeThing:
 
 type ParseableSomeThing = Annotated[
     SomeThing | None,
-    Converter(
-        lambda text: SomeThing(*scan[int, int]("{},{}")(text)),
-        pattern=r"\d+,\d+",
-        name="SomeThing",
-    ),
-    Converter(
-        lambda text: None,
-        pattern=r".+?",
-        name="NoSomeThing",
-    ),
+    OneOf[
+        Converter(
+            lambda text: SomeThing(*scan[int, int]("{},{}")(text)),
+            pattern=r"\d+,\d+",
+            name="SomeThing",
+        ),
+        Converter(
+            lambda text: None,
+            pattern=r".+?",
+            name="NoSomeThing",
+        ),
+    ],
 ]
 
 (a,) = scan[ParseableSomeThing]("{}")("1,2")

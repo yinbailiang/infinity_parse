@@ -12,6 +12,7 @@ from infinity_parse import (
     Converter,
     ConvertError,
     MatchError,
+    OneOf,
     ScanError,
     resolve_field,
     scan,
@@ -24,13 +25,17 @@ type Digits = Annotated[int, Converter(int, pattern=r"\d+", name="digits")]
 type Again = Digits
 type Key = Annotated[
     str,
-    Converter(json.loads, pattern=r'"(?:[^"\\]|\\.)*"', name="escaped"),
-    Converter(str, pattern=r"[^=\s]+", name="bare"),
+    OneOf[
+        Converter(json.loads, pattern=r'"(?:[^"\\]|\\.)*"', name="escaped"),
+        Converter(str, pattern=r"[^=\s]+", name="bare"),
+    ],
 ]
 type Value = Annotated[
     str,
-    Converter(json.loads, pattern=r'"(?:[^"\\]|\\.)*"', name="escaped"),
-    Converter(str, pattern=r".*", name="bare"),
+    OneOf[
+        Converter(json.loads, pattern=r'"(?:[^"\\]|\\.)*"', name="escaped"),
+        Converter(str, pattern=r".*", name="bare"),
+    ],
 ]
 type FloatDigits = Annotated[
     float, Converter(float, pattern=r"\d+\.\d+", name="float-digits")
@@ -270,12 +275,14 @@ def test_converter_bad_pattern_raises_at_construction() -> None:
         scan[Annotated[int, Converter(int, pattern="[")]]("{}")
 
 
-def test_multiple_converter_specs_compete_in_declaration_order() -> None:
+def test_oneof_branches_compete_in_declaration_order() -> None:
     parse = scan[
         Annotated[
             str,
-            Converter(lambda raw: "first", pattern=r"\d+"),
-            Converter(lambda raw: "second", pattern=r"[a-z]+"),
+            OneOf[
+                Converter(lambda raw: "first", pattern=r"\d+"),
+                Converter(lambda raw: "second", pattern=r"[a-z]+"),
+            ],
         ]
     ]("{}")
     # First matching branch wins.
@@ -285,25 +292,54 @@ def test_multiple_converter_specs_compete_in_declaration_order() -> None:
         parse("!!")
 
 
-def test_multiple_converter_specs_do_not_warn() -> None:
+def test_oneof_does_not_warn() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         parse = scan[
+            Annotated[
+                str,
+                OneOf[
+                    Converter(str, pattern=r"\d+"),
+                    Converter(str, pattern=r"[a-z]+"),
+                ],
+            ]
+        ]("{}")
+    assert parse("42") == ("42",)
+
+
+def test_multiple_bare_specs_are_rejected() -> None:
+    with pytest.raises(ValueError, match="multiple Converter specs"):
+        scan[
             Annotated[
                 str,
                 Converter(str, pattern=r"\d+"),
                 Converter(str, pattern=r"[a-z]+"),
             ]
         ]("{}")
-    assert parse("42") == ("42",)
+
+
+def test_oneof_validation() -> None:
+    with pytest.raises(TypeError, match="Converter instances"):
+        OneOf[Digits]
+    with pytest.raises(TypeError, match="at least one"):
+        OneOf[()]
+    with pytest.raises(TypeError, match="subscription"):
+        OneOf()
+
+
+def test_oneof_repr() -> None:
+    spec = OneOf[Converter(int, pattern=r"\d+", name="digits")]
+    assert repr(spec).startswith("OneOf[Converter(")
 
 
 def test_first_matching_branch_wins() -> None:
     parse = scan[
         Annotated[
             str,
-            Converter(lambda raw: "first", pattern=r"\w+"),
-            Converter(lambda raw: "second", pattern=r".+"),
+            OneOf[
+                Converter(lambda raw: "first", pattern=r"\w+"),
+                Converter(lambda raw: "second", pattern=r".+"),
+            ],
         ]
     ]("{}")
     assert parse("abc") == ("first",)  # both could match
@@ -314,8 +350,10 @@ def test_failing_converter_aborts_instead_of_falling_through() -> None:
     parse = scan[
         Annotated[
             int,
-            Converter(int, pattern=r"\w+"),
-            Converter(str, pattern=r".+?"),  # would match, but must not be tried
+            OneOf[
+                Converter(int, pattern=r"\w+"),
+                Converter(str, pattern=r".+?"),  # would match, must not be tried
+            ],
         ]
     ]("{}")
     assert parse("42") == (42,)
@@ -325,16 +363,16 @@ def test_failing_converter_aborts_instead_of_falling_through() -> None:
 
 def test_literal_nesting_collapses_into_one_layer() -> None:
     # typing itself flattens nested Annotated wrappers (PEP 593), so literal
-    # nesting is plain competition; only specs hidden behind an alias are
-    # rejected as ambiguous.
+    # nesting becomes a single layer -- and two bare specs on one layer are
+    # rejected just like anywhere else.
     assert get_args(Annotated[Annotated[str, "a"], "b"]) == (str, "a", "b")
-    parse = scan[
-        Annotated[
-            Annotated[str, Converter(lambda raw: "inner")],
-            Converter(lambda raw: "outer"),
-        ]
-    ]("{}")
-    assert parse("x") == ("inner",)
+    with pytest.raises(ValueError, match="multiple Converter specs"):
+        scan[
+            Annotated[
+                Annotated[str, Converter(lambda raw: "inner")],
+                Converter(lambda raw: "outer"),
+            ]
+        ]("{}")
 
 
 def test_alias_converter_specs_cannot_be_wrapped() -> None:
@@ -500,14 +538,41 @@ def test_union_member_keeps_its_multiple_specs_grouped() -> None:
     parse = scan[
         Annotated[
             str,
-            Converter(lambda raw: "digits", pattern=r"\d+"),
-            Converter(lambda raw: "suffixed", pattern=r"\d+x"),
+            OneOf[
+                Converter(lambda raw: "digits", pattern=r"\d+"),
+                Converter(lambda raw: "suffixed", pattern=r"\d+x"),
+            ],
         ]
         | Annotated[str, Converter(lambda raw: "word", pattern=r"\w+")]
     ]("{}")
     assert parse("42") == ("digits",)
     assert parse("42x") == ("suffixed",)
     assert parse("ab") == ("word",)
+
+
+def test_oneof_binds_a_union_field_as_one_group() -> None:
+    parse = scan[
+        Annotated[
+            int | float,
+            OneOf[
+                Converter(int, pattern=r"\d+"),
+                Converter(float, pattern=r"\d+\.\d+"),
+            ],
+        ]
+    ]("{}")
+    assert parse("42") == (42,)
+    assert parse("3.14") == (3.14,)
+    assert_type(parse("42"), tuple[int | float])
+
+
+def test_union_outer_oneof_rejects_member_specs() -> None:
+    with pytest.raises(ValueError, match="member specs"):
+        scan[
+            Annotated[
+                Annotated[int, Converter(int, pattern=r"\d+")] | str,
+                OneOf[Converter(str, name="outer")],
+            ]
+        ]("{}")
 
 
 def test_union_outer_annotated_specs_bind_the_whole() -> None:
