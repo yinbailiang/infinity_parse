@@ -222,7 +222,7 @@ type HttpLogDateTime = DateTime[Literal["%d/%b/%Y:%H:%M:%S %z"]]
 
 
 def _parse_syslog_datetime(text: str) -> datetime:
-    """Linux 系统日志日期时间(缺年份,按 parse 约定取当前年)。"""
+    """Linux 系统日志日期时间(条目不含年份;补当前年,与 parse 一致)。"""
     return datetime.strptime(f"{datetime.now().year} {text}", "%Y %b %d %H:%M:%S")
 
 
@@ -234,7 +234,7 @@ type SyslogDateTime = Annotated[
         name="SyslogDateTime",
     ),
 ]
-# Nov 9 03:37:44(年份为当前年,与 parse 一致);对应 parse 的 {:ts}。
+# Nov 9 03:37:44(syslog 无年份字段:补当前年,与 parse 一致);对应 parse 的 {:ts}。
 
 _AMPM_TIME_RE = RE.compile(
     r"(?P<hour>\d{1,2}):(?P<minute>\d{2})(?::(?P<second>\d{2}))?"

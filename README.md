@@ -224,8 +224,10 @@ Several shipped types are exactly such aliases — `t.CtimeDateTime` is
 The set covers character classes (`t.Letters`, `t.Word`, ...), ISO 8601 /
 RFC 2822 / ctime / HTTP-log / syslog date-times, thousands-separated integers
 (`t.CommaInt`), percents, hexadecimal / binary / octal integers, floats and
-`Decimal`. One caveat: `t.Whitespace` keeps raw spaces, but `scan` strips the
-whole input first -- whitespace-only input needs `scanall` / `search`.
+`Decimal`. Two caveats: `t.SyslogDateTime` stamps carry no year, so the
+converter fills in the current one (following `parse`); and `t.Whitespace`
+keeps raw spaces, but `scan` strips the whole input first -- whitespace-only
+input needs `scanall` / `search`.
 
 ## Combining parsers
 

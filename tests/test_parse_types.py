@@ -151,6 +151,14 @@ def test_invalid_values_raise_scan_error() -> None:
         scan[t.Int]("{}")("abc")
 
 
+def test_syslog_datetime_fills_in_the_current_year() -> None:
+    # Syslog stamps carry no year: like ``parse``, the converter fills in the
+    # current one (compared against a freshly sampled year below).
+    (value,) = scan[t.SyslogDateTime]("{}")("Nov 9 03:37:44")
+    assert (value.month, value.day, value.hour, value.minute) == (11, 9, 3, 37)
+    assert value.year == datetime.now().year
+
+
 def test_result_types_are_inferred() -> None:
     assert_type(scan[t.Int]("{}")("42"), tuple[int])
     assert_type(scan[t.Int, t.Percent]("{} {}")("1 12.5%"), tuple[int, float])
