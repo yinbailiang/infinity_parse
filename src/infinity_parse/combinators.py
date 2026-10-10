@@ -36,9 +36,7 @@ def recursive[T](builder: Callable[[Parser[T]], Parser[T]]) -> Parser[T]:
     return parser
 
 
-def split_top(
-    separator: str, delimiters: tuple[str, str]
-) -> Callable[[str], list[str]]:
+def split_top(separator: str, delimiters: tuple[str, str]) -> Parser[list[str]]:
     """Split at top-level ``separator``; ``delimiters`` protect inner ones."""
 
     def spliter(text: str) -> list[str]:
@@ -59,9 +57,7 @@ def split_top(
     return spliter
 
 
-def sep_by[T](
-    parser: Parser[T], spliter: Callable[[str], list[str]]
-) -> Parser[list[T]]:
+def sep_by[T](parser: Parser[T], spliter: Parser[list[str]]) -> Parser[list[T]]:
     """Parse the members produced by ``spliter``, one ``parser`` each."""
 
     def parse(text: str) -> list[T]:
