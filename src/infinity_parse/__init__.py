@@ -14,10 +14,10 @@ from infinity_parse.engine import (
     MatchError,
     ScanError,
     Template,
-    resolve_field,
 )
 from infinity_parse.scanner import (
     Scanner,
+    resolve_field,
     scan,
     scanall,
     search,

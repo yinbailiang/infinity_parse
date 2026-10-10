@@ -17,7 +17,7 @@ type Value = Annotated[
     Converter(str, pattern=r".*", name="bare value"),
 ]
 
-_line = scan[Key, Value]("{}={}")
+parse_line = scan[Key, Value]("{} = {}")
 
 
 def parse_kv(text: str) -> dict[str, str]:
@@ -28,8 +28,18 @@ def parse_kv(text: str) -> dict[str, str]:
         if not stripped or stripped.startswith("#"):
             continue
         try:
-            key, value = _line(stripped)  # 静态类型: tuple[str, str]
+            key, value = parse_line(stripped)
         except ScanError as error:
             raise ValueError(f"line {lineno}: {error}") from error
         result[key] = value
     return result
+
+
+print(
+    parse_kv("""# comment
+foo = bar
+"baz" = "qux"
+# another comment
+"escaped key" = "escaped value"
+""")
+)  # {'foo': 'bar', 'baz': 'qux', 'escaped key': 'escaped value'}

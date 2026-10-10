@@ -1,12 +1,11 @@
 """Curated ``parse``-style converter types (``std::scan`` specifiers)."""
 
-import re
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
 from typing import Annotated
 
-from .engine import Converter
+from .engine import RE, Converter
 
 __all__: list[str] = [
     "AmPmTime",
@@ -145,15 +144,15 @@ _DATE_TAIL = (
     r"(?:\s*(?P<tzsign>[+-])(?P<tzhour>\d{1,2}):?(?P<tzminute>\d{2}))?"
 )
 
-_GLOBAL_DATE_RE = re.compile(
+_GLOBAL_DATE_RE = RE.compile(
     r"(?P<day>\d{1,2})[/-](?P<month>\d{1,2})[/-](?P<year>\d{4})" + _DATE_TAIL
 )
-_US_DATE_RE = re.compile(
+_US_DATE_RE = RE.compile(
     r"(?P<month>\d{1,2})[/-](?P<day>\d{1,2})[/-](?P<year>\d{4})" + _DATE_TAIL
 )
 
 
-def _build_date_match(match: re.Match[str]) -> datetime:
+def _build_date_match(match: RE.Match[str]) -> datetime:
     """把上面两个日期正则的命名组装成 ``datetime``。"""
     hour = int(match["hour"] or 0)
     if match["ampm"] is not None:
@@ -259,7 +258,7 @@ type SyslogDateTime = Annotated[
 ]
 # Nov 9 03:37:44(年份为当前年,与 parse 一致);对应 parse 的 {:ts}。
 
-_AMPM_TIME_RE = re.compile(
+_AMPM_TIME_RE = RE.compile(
     r"(?P<hour>\d{1,2}):(?P<minute>\d{2})(?::(?P<second>\d{2}))?"
     r"(?:\s*(?P<ampm>[AaPp][Mm]))?"
     r"(?:\s*(?P<tzsign>[+-])(?P<tzhour>\d{1,2}):?(?P<tzminute>\d{2}))?"
@@ -406,7 +405,7 @@ type ExponentFloat = Annotated[
     Converter(
         _parse_exponent_float,
         pattern=r"[+-]?(?:(?:\d+(?:\.\d+)?|\.\d+)[eE][+-]?\d+|nan|inf(?:inity)?)",
-        flags=re.IGNORECASE,
+        flags=RE.IGNORECASE,
         name="ExponentFloat",
     ),
 ]

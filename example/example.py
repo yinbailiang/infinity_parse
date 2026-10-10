@@ -3,6 +3,7 @@ scanner built from the library's fixpoint combinator.
 """
 
 import json
+from dataclasses import dataclass
 from typing import Annotated, Any
 
 from infinity_parse import (
@@ -43,6 +44,14 @@ parse_number = scan[
 ]("{}")
 print(parse_number("42"))  # (42,)
 print(parse_number("3.14"))  # (3.14,)
+
+# A union of annotated members expands to the same competing branches:
+parse_union = scan[
+    Annotated[int, Converter(int, pattern=r"[-+]?\d+")]
+    | Annotated[float, Converter(float, pattern=r"[-+]?\d+\.\d+")]
+]("{}")
+print(parse_union("42"))  # (42,)
+print(parse_union("3.14"))  # (3.14,)
 
 
 # Escape-aware string field: json.loads decodes; bad escapes raise ConvertError.
@@ -95,3 +104,30 @@ try:
 except ScanError as error:
     print("error:", error)
     print("cause:", error.__cause__)
+
+
+@dataclass
+class SomeThing:
+    a: int
+    b: int
+
+
+type ParseableSomeThing = Annotated[
+    SomeThing | None,
+    Converter(
+        lambda text: SomeThing(*scan[int, int]("{},{}")(text)),
+        pattern=r"\d+,\d+",
+        name="SomeThing",
+    ),
+    Converter(
+        lambda text: None,
+        pattern=r".+?",
+        name="NoSomeThing",
+    ),
+]
+
+(a,) = scan[ParseableSomeThing]("{}")("1,2")
+print(a)  # SomeThing(a=1, b=2)
+
+(b,) = scan[ParseableSomeThing]("{}")("1,a")
+print(b)  # None

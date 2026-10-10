@@ -68,11 +68,33 @@ parse('age=42 name="kim"')  # (42, '"kim"')
 ignored unless it contains a `Converter` spec. Several specs on one field
 compete in declaration order: each branch carries its own pattern, the first
 branch whose pattern matches wins, and if its converter then fails the whole
-scan fails — a failing converter never falls back to a later branch.
+scan fails — a failing converter never falls back to a later branch. **All
+branches must sit on one `Annotated` layer** — mixing specs across layers is
+rejected; see [Specs must sit on one layer](#specs-must-sit-on-one-layer).
 
-Converters can also travel in a PEP 695 `type` alias; aliases are expanded at
-runtime exactly as type checkers expand them statically — chains included, and
-plain aliases (`type MyInt = int`) pass through as well:
+A `|` union of annotated members is sugar for the same competition: each
+member becomes one branch group in member order, and a member without a
+`Converter` falls back to its default branch:
+
+```python
+from typing import Annotated
+
+from infinity_parse import Converter, scan
+
+parse_number = scan[
+    Annotated[int, Converter(int, pattern=r"\d+")]
+    | Annotated[float, Converter(float, pattern=r"\d+\.\d+")]
+]("{}")
+parse_number("42")  # (42,)
+parse_number("3.14")  # (3.14,)
+```
+
+Specs on an `Annotated` wrapping the whole union bind it as one branch group;
+combining them with specs on the members is a construction-time error.
+
+**Declare converter aliases with the PEP 695 `type` statement.** Aliases are
+expanded at runtime exactly as type checkers expand them statically — chains
+included, and plain aliases (`type MyInt = int`) pass through as well:
 
 ```python
 from typing import Annotated
@@ -83,6 +105,36 @@ type Age = Annotated[int, Converter(int, pattern=r"\d+", name="age")]
 
 scan[Age]("{}")("42")  # (42,)
 ```
+
+A plain assignment (`Age = Annotated[int, ...]`) works the same on its own,
+but it **is** the `Annotated` object: `typing` collapses any `Annotated`
+wrapping it into one layer before this library sees it, so mixed layers like
+`Annotated[Age, C2]` go undetected — the very trap the checks below exist to
+catch. **Always use the `type` statement for aliases that carry converters.**
+
+### Specs must sit on one layer
+
+**All branches of a field must be declared on a single `Annotated` layer.**
+An outer layer cannot override an inner one, and specs hidden inside a `type`
+alias are usually invisible at the call site — so mixing specs across layers
+is rejected at construction time:
+
+```python
+from typing import Annotated
+
+from infinity_parse import Converter, scan
+
+type Age = Annotated[int, Converter(int, pattern=r"\d+", name="age")]
+
+scan[Age]("{}")("42")  # (42,)
+scan[Annotated[Age, Converter(int, name="outer")]]("{}")
+# ValueError: Converter specs on multiple nested Annotated layers; declare
+#   all branches on a single layer, e.g. Annotated[T, C1, C2]
+```
+
+The same rule rejects specs on an `Annotated` wrapping a union together with
+specs on its members — declare every branch on the members instead
+(`Annotated[int, C1] | Annotated[str, C2]`).
 
 ### Escaped strings
 

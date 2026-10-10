@@ -13,7 +13,9 @@ defaults (containers via ``ast.literal_eval``, ``bool`` literals); see the
 project README for the full guide -- usage, semantics and examples.
 """
 
+import ast
 import types
+from collections.abc import Callable, Iterable
 from typing import Annotated, Any, TypeAliasType, cast, get_args, get_origin
 
 from infinity_parse.engine import (
@@ -23,7 +25,6 @@ from infinity_parse.engine import (
     MatchError,
     ScanError,
     Template,
-    resolve_field,
 )
 
 __all__: list[str] = [
@@ -32,29 +33,155 @@ __all__: list[str] = [
     "MatchError",
     "ScanError",
     "Scanner",
+    "resolve_field",
     "scan",
     "scanall",
     "search",
 ]
 
 
+def _has_converter(items: Iterable[Any]) -> bool:
+    """Whether ``items`` contains at least one ``Converter``."""
+    return any(isinstance(item, Converter) for item in items)
+
+
 def flatten_annotated(meta: Any) -> tuple[Any, list[Any]]:
-    """Flatten nested ``Annotated`` wrappers and PEP 695 aliases"""
+    """Flatten nested ``Annotated`` wrappers and PEP 695 aliases.
+
+    An ``Annotated`` adding specs on top of an alias that already carries
+    them is rejected: an outer layer cannot override an inner one.
+    """
     if isinstance(meta, TypeAliasType):
         return flatten_annotated(meta.__value__)
     if get_origin(meta) is not Annotated:
         return meta, []
     args = get_args(meta)
     base, metadata = flatten_annotated(args[0])
+    if _has_converter(metadata) and _has_converter(args[1:]):
+        raise ValueError(
+            "Converter specs on multiple nested Annotated layers; declare "
+            "all branches on a single layer, e.g. Annotated[T, C1, C2]"
+        )
     return base, [*metadata, *args[1:]]
 
 
-def build_field(meta: Any) -> Field:
-    """Extract one declaration's Converter specs and resolve them via the engine."""
-    declared, metadata = flatten_annotated(meta)
-    converters: list[Converter[Any]] = [
+def _literal_converter(origin: type[Any]) -> Callable[[str], Any]:
+    return lambda text: origin(ast.literal_eval(text))
+
+
+_BOOL_VALUES = {"true": True, "false": False, "1": True, "0": False}
+
+
+def _bool_converter(text: str) -> bool:
+    value = _BOOL_VALUES.get(text.casefold())
+    if value is None:
+        raise ValueError(f"cannot parse {text!r} as bool")
+    return value
+
+
+# Built-in defaults, keyed by type object (not by name).
+_BUILTIN_CONVERTERS: dict[object, Callable[[str], Any]] = {
+    bool: _bool_converter,
+    dict: _literal_converter(dict),
+    frozenset: _literal_converter(frozenset),
+    list: _literal_converter(list),
+    set: _literal_converter(set),
+    tuple: _literal_converter(tuple),
+}
+
+
+def _default_converter(converter: object) -> Callable[[str], Any] | None:
+    """Return the built-in default converter for supported built-in types."""
+    origin = get_origin(converter)
+    return _BUILTIN_CONVERTERS.get(origin if origin is not None else converter)
+
+
+def _converter_name(converter: object) -> str | None:
+    """Return the display name of ``converter`` (used to label fields)."""
+    name = getattr(converter, "__name__", None)
+    if isinstance(name, str):
+        return name
+    origin = get_origin(converter)
+    if origin is not None:
+        name = getattr(origin, "__name__", None)
+        if isinstance(name, str):
+            return name
+    return None
+
+
+def _default_branch(declared: Any) -> Converter[Any]:
+    """Default converter branch for a declared type without ``Converter`` specs."""
+    branch: Converter[Any] = Converter(
+        fn=_default_converter(declared) or declared,
+        name=_converter_name(declared),
+    )
+    return branch
+
+
+def resolve_field(declared: Any, convs: list[Converter[Any]]) -> Field:
+    """Resolve one field's meta into its converter branches (meta -> converters)."""
+    if convs:
+        return Field(converters=tuple(convs))
+    return Field(converters=(_default_branch(declared),))
+
+
+def _is_union(meta: Any) -> bool:
+    """Whether ``meta`` is a union (PEP 604 and ``typing.Union`` are one in 3.14)."""
+    return get_origin(meta) is types.UnionType
+
+
+def _join_union(members: list[Any]) -> Any:
+    """Rebuild one union from peeled member types (``|`` keeps the union flat)."""
+    joined: Any = members[0]
+    for member in members[1:]:
+        joined = joined | member
+    return joined
+
+
+def _has_specs(meta: Any) -> bool:
+    """Whether ``meta`` carries explicit ``Converter`` specs (defaults excluded)."""
+    base, metadata = flatten_annotated(meta)
+    if _has_converter(metadata):
+        return True
+    return _is_union(base) and any(_has_specs(member) for member in get_args(base))
+
+
+def normalize_meta(meta: Any) -> tuple[Any, list[Converter[Any]]]:
+    """Flatten annotations; expand union members into converter branches.
+
+    ``Annotated[int, C1] | Annotated[float, C2]`` normalizes to ``int | float``
+    with ``[C1, C2]``; members without specs contribute a default branch.
+    Specs on an ``Annotated`` wrapping the whole union bind it as one branch
+    group, unless members carry their own specs (rejected as ambiguous).
+    Non-``Converter`` metadata is ignored.
+    """
+    base, metadata = flatten_annotated(meta)
+    convs: list[Converter[Any]] = [
         cast(Converter[Any], item) for item in metadata if isinstance(item, Converter)
     ]
+    if not _is_union(base):
+        return base, convs
+    if convs:
+        if any(_has_specs(member) for member in get_args(base)):
+            raise ValueError(
+                "Converter specs on an Annotated wrapping a union cannot be "
+                "combined with member specs; attach each spec to its own member"
+            )
+        return base, convs
+    members: list[Any] = []
+    for member in get_args(base):
+        member_base, member_convs = normalize_meta(member)
+        members.append(member_base)
+        if member_convs:
+            convs.extend(member_convs)
+        else:
+            convs.append(_default_branch(member_base))
+    return _join_union(members), convs
+
+
+def build_field(meta: Any) -> Field:
+    """Extract one declaration's Converter specs (unions included) and resolve them."""
+    declared, converters = normalize_meta(meta)
     return resolve_field(declared, converters)
 
 

@@ -1,11 +1,10 @@
-"""Runtime engine for :mod:`infinity_parse`: resolve field metas, then scan input."""
+"""Runtime engine for :mod:`infinity_parse`: compile templates, then scan input."""
 
-import ast
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, get_origin
+from typing import Any
 
 # Default capture pattern for "{}" fields.
 RE = re
@@ -49,64 +48,12 @@ class Field:
     converters: tuple[Converter[Any], ...]
 
 
-def _converter_name(converter: object) -> str | None:
-    """Return the display name of ``converter`` (used to label fields)."""
-    name = getattr(converter, "__name__", None)
-    if isinstance(name, str):
-        return name
-    origin = get_origin(converter)
-    if origin is not None:
-        name = getattr(origin, "__name__", None)
-        if isinstance(name, str):
-            return name
-    return None
-
-
 def _label(converter: Converter[Any]) -> str:
     """Display name of one converter branch in error messages."""
-    return converter.name or _converter_name(converter.fn) or repr(converter.fn)
-
-
-def _literal_converter(origin: type[Any]) -> Callable[[str], Any]:
-    return lambda text: origin(ast.literal_eval(text))
-
-
-_BOOL_VALUES = {"true": True, "false": False, "1": True, "0": False}
-
-
-def _bool_converter(text: str) -> bool:
-    value = _BOOL_VALUES.get(text.casefold())
-    if value is None:
-        raise ValueError(f"cannot parse {text!r} as bool")
-    return value
-
-
-# Built-in defaults, keyed by type object (not by name).
-_BUILTIN_CONVERTERS: dict[object, Callable[[str], Any]] = {
-    bool: _bool_converter,
-    dict: _literal_converter(dict),
-    frozenset: _literal_converter(frozenset),
-    list: _literal_converter(list),
-    set: _literal_converter(set),
-    tuple: _literal_converter(tuple),
-}
-
-
-def _default_converter(converter: object) -> Callable[[str], Any] | None:
-    """Return the built-in default converter for supported built-in types."""
-    origin = get_origin(converter)
-    return _BUILTIN_CONVERTERS.get(origin if origin is not None else converter)
-
-
-def resolve_field(declared: Any, convs: list[Converter[Any]]) -> Field:
-    """Resolve one field's meta into its converter branches (meta -> converters)."""
-    if convs:
-        return Field(converters=tuple(convs))
-    branch: Converter[Any] = Converter(
-        fn=_default_converter(declared) or declared,
-        name=_converter_name(declared),
-    )
-    return Field(converters=(branch,))
+    name = getattr(converter.fn, "__name__", None)
+    if not isinstance(name, str):
+        name = repr(converter.fn)
+    return converter.name or name
 
 
 def _literal_to_pattern(text: str) -> str:

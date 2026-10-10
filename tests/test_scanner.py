@@ -13,6 +13,7 @@ from infinity_parse import (
     ConvertError,
     MatchError,
     ScanError,
+    resolve_field,
     scan,
     scanall,
     search,
@@ -30,6 +31,9 @@ type Value = Annotated[
     str,
     Converter(json.loads, pattern=r'"(?:[^"\\]|\\.)*"', name="escaped"),
     Converter(str, pattern=r".*", name="bare"),
+]
+type FloatDigits = Annotated[
+    float, Converter(float, pattern=r"\d+\.\d+", name="float-digits")
 ]
 
 
@@ -319,15 +323,23 @@ def test_failing_converter_aborts_instead_of_falling_through() -> None:
         parse("abc")
 
 
-def test_nested_converter_layers_compete_innermost_first() -> None:
+def test_literal_nesting_collapses_into_one_layer() -> None:
+    # typing itself flattens nested Annotated wrappers (PEP 593), so literal
+    # nesting is plain competition; only specs hidden behind an alias are
+    # rejected as ambiguous.
+    assert get_args(Annotated[Annotated[str, "a"], "b"]) == (str, "a", "b")
     parse = scan[
         Annotated[
             Annotated[str, Converter(lambda raw: "inner")],
             Converter(lambda raw: "outer"),
         ]
     ]("{}")
-    # Nested Annotated: inner branch competes first.
     assert parse("x") == ("inner",)
+
+
+def test_alias_converter_specs_cannot_be_wrapped() -> None:
+    with pytest.raises(ValueError, match="nested Annotated layers"):
+        scan[Annotated[Digits, Converter(lambda raw: raw, name="outer")]]("{}")
 
 
 def test_pep695_alias_meta_expands_like_inline() -> None:
@@ -448,3 +460,104 @@ def test_match_and_convert_errors_are_distinct() -> None:
     with pytest.raises(ConvertError) as exc_info:
         scan[int]("{}")("abc")
     assert isinstance(exc_info.value, ScanError)
+
+
+def test_union_members_expand_to_competing_branches() -> None:
+    parse = scan[
+        Annotated[int, Converter(int, pattern=r"\d+", name="int")]
+        | Annotated[float, Converter(float, pattern=r"\d+\.\d+", name="float")]
+    ]("{}")
+    assert parse("42") == (42,)
+    assert parse("3.14") == (3.14,)
+    assert_type(parse("42"), tuple[int | float])
+    with pytest.raises(MatchError):
+        parse("abc")
+
+
+def test_union_branch_order_follows_member_order() -> None:
+    parse = scan[
+        Annotated[str, Converter(lambda raw: "first", pattern=r"\w+")]
+        | Annotated[str, Converter(lambda raw: "second", pattern=r".+")]
+    ]("{}")
+    assert parse("abc") == ("first",)
+    assert parse("a b") == ("second",)
+
+
+def test_union_member_without_specs_gets_default_branch() -> None:
+    parse = scan[Annotated[int, Converter(int, pattern=r"\d+")] | str]("{}")
+    assert parse("42") == (42,)
+    assert parse("abc") == ("abc",)
+    assert_type(parse("abc"), tuple[int | str])
+
+
+def test_union_alias_members_expand() -> None:
+    parse = scan[Digits | FloatDigits]("{}")
+    assert parse("42") == (42,)
+    assert parse("3.14") == (3.14,)
+
+
+def test_union_member_keeps_its_multiple_specs_grouped() -> None:
+    parse = scan[
+        Annotated[
+            str,
+            Converter(lambda raw: "digits", pattern=r"\d+"),
+            Converter(lambda raw: "suffixed", pattern=r"\d+x"),
+        ]
+        | Annotated[str, Converter(lambda raw: "word", pattern=r"\w+")]
+    ]("{}")
+    assert parse("42") == ("digits",)
+    assert parse("42x") == ("suffixed",)
+    assert parse("ab") == ("word",)
+
+
+def test_union_outer_annotated_specs_bind_the_whole() -> None:
+    parse = scan[Annotated[int | str, Converter(int, pattern=r"\d+")]]("{}")
+    assert parse("42") == (42,)
+    with pytest.raises(MatchError):
+        parse("abc")
+
+
+def test_union_outer_specs_reject_member_specs() -> None:
+    with pytest.raises(ValueError, match="member specs"):
+        scan[
+            Annotated[
+                Annotated[int, Converter(int, pattern=r"\d+")] | str,
+                Converter(str, name="outer"),
+            ]
+        ]("{}")
+
+
+def test_non_converter_metadata_is_transparent_for_unions() -> None:
+    parse = scan[
+        Annotated[Annotated[int, Converter(int, pattern=r"\d+")] | str, "doc"]
+    ]("{}")
+    assert parse("42") == (42,)
+    assert parse("abc") == ("abc",)
+
+
+def test_non_converter_metadata_does_not_bind_a_union() -> None:
+    parse = scan[Annotated[int | str, "doc"]]("{}")
+    assert parse("42") == (42,)
+    with pytest.raises(ConvertError, match="using int"):
+        parse("abc")
+
+
+def test_non_converter_inner_metadata_keeps_outer_specs() -> None:
+    parse = scan[Annotated[Annotated[int, "doc"], Converter(int, pattern=r"\d+")]]("{}")
+    assert parse("42") == (42,)
+
+
+def test_bare_union_expands_with_default_branches() -> None:
+    parse = scan[int | str]("{}")
+    assert parse("42") == (42,)
+    with pytest.raises(ConvertError, match="using int"):
+        parse("abc")
+
+
+def test_resolve_field_meta_to_converter() -> None:
+    custom = resolve_field(dict, [Converter(json.loads, name="dict")])
+    assert custom.converters[0].fn is json.loads
+    assert custom.converters[0].name == "dict"
+    assert resolve_field(int, []).converters[0].fn is int
+    default = resolve_field(dict, [])
+    assert default.converters[0].fn("{}") == {}

@@ -1,6 +1,5 @@
-"""Tests for the backend engine: resolve metas, then scan."""
+"""Tests for the backend engine: compile templates and scan."""
 
-import json
 import re
 from typing import Any
 
@@ -13,7 +12,6 @@ from infinity_parse.engine import (
     MatchError,
     ScanError,
     Template,
-    resolve_field,
 )
 
 
@@ -44,15 +42,6 @@ def test_engine_validates_configuration() -> None:
         Template("{}", (_field(42),))
     with pytest.raises(ValueError, match="at least one converter"):
         Template("{}", (Field(converters=()),))
-
-
-def test_engine_resolves_field_meta_to_converter() -> None:
-    custom = resolve_field(dict, [Converter(json.loads, name="dict")])
-    assert custom.converters[0].fn is json.loads
-    assert custom.converters[0].name == "dict"
-    assert resolve_field(int, []).converters[0].fn is int
-    default = resolve_field(dict, [])
-    assert default.converters[0].fn("{}") == {}
 
 
 def test_engine_escapes_literal_braces() -> None:
