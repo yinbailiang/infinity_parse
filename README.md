@@ -223,6 +223,10 @@ scan[LogStamp]("{}")("2024-01-15 12:30:45")
 # (datetime(2024, 1, 15, 12, 30, 45),)
 ```
 
+Several shipped types are exactly such aliases — `t.CtimeDateTime` is
+`t.DateTime[Literal["%a %b %d %H:%M:%S %Y"]]`, and `t.HttpLogDateTime` is
+`t.DateTime[Literal["%d/%b/%Y:%H:%M:%S %z"]]`.
+
 The set covers character classes (`t.Letters`, `t.Word`, ...), ISO 8601 /
 RFC 2822 / ctime / HTTP-log / syslog date-times, thousands-separated integers
 (`t.CommaInt`), percents, hexadecimal / binary / octal integers, floats and

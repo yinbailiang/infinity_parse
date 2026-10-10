@@ -3,7 +3,7 @@
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
-from typing import Annotated, Any, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from .engine import RE, Converter
 
@@ -213,35 +213,11 @@ type UsDate = Annotated[
 # 1/20/1972 10:21:36 PM +10:30(月/日);对应 parse 的 {:ta}。
 
 
-def _parse_ctime_datetime(text: str) -> datetime:
-    """``ctime`` 风格日期时间。"""
-    return datetime.strptime(text, "%a %b %d %H:%M:%S %Y")
-
-
-type CtimeDateTime = Annotated[
-    datetime,
-    Converter(
-        _parse_ctime_datetime,
-        pattern=r"[A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}",
-        name="CtimeDateTime",
-    ),
-]
+type CtimeDateTime = DateTime[Literal["%a %b %d %H:%M:%S %Y"]]
 # Sun Sep 16 01:03:52 1973;对应 parse 的 {:tc}。
 
 
-def _parse_http_log_datetime(text: str) -> datetime:
-    """HTTP 日志风格日期时间(带 ``+0000`` 偏移)。"""
-    return datetime.strptime(text, "%d/%b/%Y:%H:%M:%S %z")
-
-
-type HttpLogDateTime = Annotated[
-    datetime,
-    Converter(
-        _parse_http_log_datetime,
-        pattern=r"\d{1,2}/[A-Za-z]{3}/\d{4}:\d{2}:\d{2}:\d{2}\s+[+-]\d{4}",
-        name="HttpLogDateTime",
-    ),
-]
+type HttpLogDateTime = DateTime[Literal["%d/%b/%Y:%H:%M:%S %z"]]
 # 21/Nov/2011:00:07:11 +0000;对应 parse 的 {:th}。
 
 
