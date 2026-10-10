@@ -36,28 +36,36 @@ def recursive[T](builder: Callable[[Parser[T]], Parser[T]]) -> Parser[T]:
     return parser
 
 
-def split_top(text: str, separator: str) -> list[str]:
-    """Split at top-level ``separator`` characters; brackets protect inner ones."""
-    parts: list[str] = []
-    depth = 0
-    start = 0
-    for index, character in enumerate(text):
-        if character in "{[":
-            depth += 1
-        elif character in "}]":
-            depth -= 1
-        elif character == separator and depth == 0:
-            parts.append(text[start:index])
-            start = index + 1
-    parts.append(text[start:])
-    return parts
+def split_top(
+    separator: str, delimiters: tuple[str, str]
+) -> Callable[[str], list[str]]:
+    """Split at top-level ``separator``; ``delimiters`` protect inner ones."""
+
+    def spliter(text: str) -> list[str]:
+        parts: list[str] = []
+        depth = 0
+        start = 0
+        for index, character in enumerate(text):
+            if character in delimiters[0]:
+                depth += 1
+            elif character in delimiters[1]:
+                depth -= 1
+            elif character == separator and depth == 0:
+                parts.append(text[start:index])
+                start = index + 1
+        parts.append(text[start:])
+        return parts
+
+    return spliter
 
 
-def sep_by[T](parser: Parser[T], separator: str = ",") -> Parser[list[T]]:
-    """Parse top-level ``separator``-separated members, one ``parser`` each."""
+def sep_by[T](
+    parser: Parser[T], spliter: Callable[[str], list[str]]
+) -> Parser[list[T]]:
+    """Parse the members produced by ``spliter``, one ``parser`` each."""
 
     def parse(text: str) -> list[T]:
-        return [parser(member) for member in split_top(text, separator)]
+        return [parser(member) for member in spliter(text)]
 
     return parse
 

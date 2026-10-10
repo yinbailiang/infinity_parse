@@ -15,6 +15,7 @@ from infinity_parse import (
     recursive,
     scan,
     sep_by,
+    split_top,
 )
 
 parse = scan[
@@ -71,8 +72,9 @@ def build_node(self: Parser[Any]) -> Parser[Any]:
         key, _, raw = member.partition(":")
         return key.strip(), self(raw)
 
-    pairs = sep_by(parse_pair)
-    members = sep_by(self)
+    split_commas = split_top(",", ("[{", "}]"))
+    pairs = sep_by(parse_pair, split_commas)
+    members = sep_by(self, split_commas)
 
     def to_object(text: str) -> Any:
         return dict(pairs(text[1:-1]))

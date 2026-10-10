@@ -207,19 +207,23 @@ callables (all re-exported from the package root):
 * `alt(*parsers)` -- ordered choice; only `MatchError` (no match) falls
   through, while a conversion failure aborts.
 * `recursive(builder)` -- fixpoint for grammars that nest.
-* `sep_by(parser, separator=",")` / `split_top(text, separator)` -- top-level
-  separated lists; brackets protect inner separators.
+* `split_top(separator, delimiters)` -- build a splitter: splits at top-level
+  `separator` characters, while `delimiters` (the open and close character
+  sets) protect nested text.
+* `sep_by(parser, spliter)` -- top-level separated lists, one `parser` per
+  member.
 * `first_field(parser)` -- adapt a scanner into a plain `Parser[T]` (a
   `Callable[[str], T]`), so it can sit inside the others.
 
 ```python
-from infinity_parse import alt, first_field, scan, sep_by
+from infinity_parse import alt, first_field, scan, sep_by, split_top
 
 value = alt(first_field(scan[str]('"{}"')), first_field(scan[str]("{}")))
 value('"hi"')  # 'hi'
 value("hi")  # 'hi'
 
-numbers = sep_by(first_field(scan[int]("{}")))
+split_commas = split_top(",", ("[{", "}]"))
+numbers = sep_by(first_field(scan[int]("{}")), split_commas)
 numbers("1, 2, 3")  # [1, 2, 3]
 ```
 

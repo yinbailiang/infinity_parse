@@ -50,19 +50,25 @@ def test_recursive_supports_nested_input() -> None:
 
 
 def test_sep_by_parses_separated_members() -> None:
-    numbers = sep_by(first_field(scan[int]("{}")))
+    numbers = sep_by(first_field(scan[int]("{}")), split_top(",", ("[{", "}]")))
     assert numbers("1, 2, 3") == [1, 2, 3]
 
 
 def test_sep_by_uses_a_custom_separator() -> None:
-    words = sep_by(first_field(scan[str]("{}")), separator=";")
+    words = sep_by(first_field(scan[str]("{}")), split_top(";", ("[{", "}]")))
     assert words("a; b") == ["a", "b"]
 
 
 def test_split_top_protects_bracketed_separators() -> None:
-    assert split_top("a,b[c,d],e", ",") == ["a", "b[c,d]", "e"]
-    assert split_top("{a,b},c", ",") == ["{a,b}", "c"]
-    assert split_top("solo", ",") == ["solo"]
+    split = split_top(",", ("[{", "}]"))
+    assert split("a,b[c,d],e") == ["a", "b[c,d]", "e"]
+    assert split("{a,b},c") == ["{a,b}", "c"]
+    assert split("solo") == ["solo"]
+
+
+def test_split_top_accepts_custom_delimiters() -> None:
+    split = split_top("|", ("(", ")"))
+    assert split("a|f(b|c)|d") == ["a", "f(b|c)", "d"]
 
 
 def test_first_field_unwraps_a_single_field_scanner() -> None:
