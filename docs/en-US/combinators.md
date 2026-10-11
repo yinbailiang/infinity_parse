@@ -75,6 +75,10 @@ parse("(((x)))")  # 'x'
 parse("x")  # 'x'
 ```
 
+> Nesting depth is bounded by the interpreter recursion limit: roughly 300-350
+> levels with default settings (about 3 frames per level); very deep grammars
+> need `sys.setrecursionlimit` (with the usual stack-overflow caveats).
+
 ## split_top — Top-Level Splitting
 
 ```python
@@ -93,7 +97,8 @@ split_commas("1, [2, 3], {4, 5}")  # ['1', ' [2, 3]', ' {4, 5}']
 ```
 
 - Depth is counted per character: any character in the open set `+1`, any in the
-  close set `-1`.
+  close set `-1`; only the sets you pass are protected (`("[{", "}]")` protects
+  `[]` and `{}`, not parentheses — pass `("([{", ")]}")` to include them).
 - The separator only splits at depth 0; there is no quote awareness.
 - Empty input returns `['']`.
 

@@ -17,13 +17,20 @@ def alt[T](*parsers: Parser[T]) -> Parser[T]:
                 return parser(text)
             except MatchError as error:
                 failure = error
-        raise MatchError(f"no alternative matched {text!r}") from failure
+        raise MatchError(
+            f"no alternative matched {text!r}", input_value=text
+        ) from failure
 
     return parse
 
 
 def recursive[T](builder: Callable[[Parser[T]], Parser[T]]) -> Parser[T]:
-    """Fixpoint combinator: ``builder`` receives a thunk to the finished parser."""
+    """Fixpoint combinator: ``builder`` receives a thunk to the finished parser.
+
+    Nesting is bounded by the interpreter recursion limit (roughly 300-350
+    levels for typical grammars with default settings), so very deep grammars
+    may need ``sys.setrecursionlimit``.
+    """
 
     ref: Parser[T] | None = None
 
@@ -37,7 +44,13 @@ def recursive[T](builder: Callable[[Parser[T]], Parser[T]]) -> Parser[T]:
 
 
 def split_top(separator: str, delimiters: tuple[str, str]) -> Parser[list[str]]:
-    """Split at top-level ``separator``; ``delimiters`` protect inner ones."""
+    """Split at top-level ``separator``; ``delimiters`` protect inner ones.
+
+    ``delimiters`` is a pair of character sets (open, close): any character
+    from the open set increases nesting and any from the close set decreases
+    it. Only the characters you pass are protected — e.g. ``("[{", "}]")``
+    protects ``[]`` and ``{}``, but not parentheses.
+    """
 
     def spliter(text: str) -> list[str]:
         parts: list[str] = []

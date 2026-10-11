@@ -17,9 +17,11 @@ import ast
 import types
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Annotated, Any, TypeAliasType, cast, get_args, get_origin
 
 from infinity_parse.engine import (
+    RE,
     Converter,
     ConvertError,
     Field,
@@ -223,10 +225,29 @@ def normalize_meta(meta: Any) -> tuple[Any, list[Converter[Any]]]:
     return _join_union(members), convs
 
 
-def build_field(meta: Any) -> Field:
-    """Extract one declaration's Converter specs (unions included) and resolve them."""
+def _build_field_uncached(meta: Any) -> Field:
+    """Resolve one declaration without the cache (see ``build_field``)."""
     declared, converters = normalize_meta(meta)
     return resolve_field(declared, converters)
+
+
+@lru_cache(maxsize=256)
+def _build_field_cached(meta: Any) -> Field:
+    """``build_field`` behind an LRU cache (hashable metas only)."""
+    return _build_field_uncached(meta)
+
+
+def build_field(meta: Any) -> Field:
+    """Extract one declaration's Converter specs (unions included) and resolve them.
+
+    Resolution is cached for hashable metas; unhashable metas (e.g. a list in
+    ``Annotated`` metadata) fall back to the uncached path instead of raising.
+    """
+    try:
+        return _build_field_cached(meta)
+    except TypeError:
+        # lru_cache rejects unhashable arguments; keep those metas working.
+        return _build_field_uncached(meta)
 
 
 class Scanner[*Meta]:
@@ -266,6 +287,11 @@ class Scanner[*Meta]:
     def findall(self, input_value: str) -> list[tuple[*Meta]]:
         """All non-overlapping matches, left to right."""
         return self._engine.findall(input_value)
+
+    @property
+    def raw_pattern(self) -> RE.Pattern[str]:
+        """The compiled template regex: one named group per ``{}`` field."""
+        return self._engine.pattern
 
 
 class _ScannerAlias(types.GenericAlias):

@@ -79,6 +79,25 @@ parse_name(r'"kim \"the fox\""')  # ('kim "the fox"',)
 parse_name(r'"C:\\path\\to\\file"')  # ('C:\\path\\to\\file',)
 ```
 
+### 捕获大文本块
+
+默认模式 `.+?` 是惰性的——为「字段后还有锚点」的场景设计，逐字符扩展以找到最短
+匹配。对没有后续锚点的大段捕获（如文档正文），惰性量词在 CPython 上代价很高：
+1 MB 捕获实测约 **8 ms**，而显式的贪婪 DOTALL 模式约 **1 µs**：
+
+```python
+from typing import Annotated
+
+from infinity_parse import Converter, scan
+
+Blob = Annotated[str, Converter(str, pattern=r"(?s:.+)")]
+parse_doc = scan[Blob]("{}")
+
+parse_doc("任意大小的文本…")  # 大输入下开销几乎可忽略
+```
+
+不要修改默认模式——最短匹配（惰性）语义是模板行为的基石。
+
 ### 转换器里嵌扫描器
 
 `Converter.fn` 可以是另一个扫描器——字段整体先由外层模式捕获，再交给内层扫描器解析：
@@ -178,6 +197,27 @@ scan[int, int]("{} {}")("1 zz")
 - 原始异常保存在 `__cause__`：如 `ValueError`、`SyntaxError`、`json.JSONDecodeError`。
 - `search` / `findall` 的偏移同样相对原始输入（不补偿 strip）。
 - 嵌套扫描器的错误会形成 `__cause__` 链。
+
+两个异常还同时暴露等价的结构化属性，无需解析消息字符串即可程序化消费：
+
+| 异常 | 结构化属性 |
+| - | - |
+| `MatchError` | `input_value`、`template`（未知时为 `None`） |
+| `ConvertError` | `field`、`offset`、`text`、`converter`、`input_value`、`template` |
+
+```python
+from infinity_parse import ConvertError, scan
+
+try:
+    scan[int, int]("{} {}")("1 zz")
+except ConvertError as error:
+    error.field  # 2
+    error.offset  # 2
+    error.text  # 'zz'
+    error.converter  # 'int'
+```
+
+`alt` 抛出的 `MatchError` 同样携带 `input_value`（见 [combinators.md](combinators.md)）。
 
 ## 低层构建
 

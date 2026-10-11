@@ -14,15 +14,61 @@ WHITESPACE: RE.Pattern[str] = RE.compile(r"\s+")
 
 
 class ScanError(ValueError):
-    """Base class for scan failures."""
+    """Base class for scan failures.
+
+    ``MatchError`` and ``ConvertError`` add machine-readable attributes for
+    the failed match or conversion (see their docstrings).
+    """
 
 
 class MatchError(ScanError):
-    """The input did not match the template (soft failure)."""
+    """The input did not match the template (soft failure).
+
+    ``input_value`` and ``template`` carry the scanned input and the template
+    text when available, and ``None`` otherwise.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        /,
+        *,
+        input_value: str | None = None,
+        template: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.input_value = input_value
+        self.template = template
 
 
 class ConvertError(ScanError):
-    """A field matched but its converter failed (hard failure)."""
+    """A field matched but its converter failed (hard failure).
+
+    Structured details mirror the message: ``field`` (1-based field number),
+    ``offset`` (start of the captured text in the original input), ``text``
+    (the text given to the converter) and ``converter`` (display label), plus
+    ``input_value`` and ``template`` when available.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        /,
+        *,
+        field: int | None = None,
+        offset: int | None = None,
+        text: str | None = None,
+        converter: str | None = None,
+        input_value: str | None = None,
+        template: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.field = field
+        self.offset = offset
+        self.text = text
+        self.converter = converter
+        self.input_value = input_value
+        self.template = template
 
 
 @dataclass(frozen=True)
@@ -162,12 +208,12 @@ def _compile(template: str, fields: tuple[Field, ...]) -> RE.Pattern[str]:
     return RE.compile("".join(chunks))
 
 
-def _winner(match: RE.Match[str], index: int, field: Field) -> int:
+def _winner(match: RE.Match[str], index: int, branch_names: tuple[str, ...]) -> int:
     """Index of the branch whose pattern produced the field's match."""
-    if len(field.converters) == 1:
+    if not branch_names:
         return 0
-    for branch, _ in enumerate(field.converters):
-        if match.group(_branch_group(index, branch)) is not None:
+    for branch, name in enumerate(branch_names):
+        if match.group(name) is not None:
             return branch
     raise AssertionError(f"no converter branch matched field {index}")
 
@@ -195,47 +241,73 @@ class Template:
         self.template = template
         self.fields = fields
         self.pattern = _compile(template, fields)
+        self._field_names = tuple(f"s{index}" for index in range(len(fields)))
+        self._branch_names: tuple[tuple[str, ...], ...] = tuple(
+            tuple(
+                _branch_group(index, branch) for branch in range(len(field.converters))
+            )
+            if len(field.converters) > 1
+            else ()
+            for index, field in enumerate(fields)
+        )
 
     def fullmatch(self, input_value: str) -> tuple[Any, ...]:
         """Scan ``input_value``: match the template and convert each field."""
         match = self.pattern.fullmatch(input_value.strip())
         if match is None:
             raise MatchError(
-                f"input {input_value!r} does not match template {self.template!r}"
+                f"input {input_value!r} does not match template {self.template!r}",
+                input_value=input_value,
+                template=self.template,
             )
-        # Report offsets against the original input.
-        shift = len(input_value) - len(input_value.lstrip())
-        return self._convert(match, input_value, shift)
+        # Error offsets are reported against the original input; the strip
+        # shift is only computed when a conversion actually fails.
+        return self._convert(match, input_value, stripped=True)
 
     def search(self, input_value: str) -> tuple[Any, ...] | None:
         """Scan ``input_value`` for the first match; ``None`` when not found."""
         match = self.pattern.search(input_value)
         if match is None:
             return None
-        return self._convert(match, input_value, 0)
+        return self._convert(match, input_value, stripped=False)
 
     def findall(self, input_value: str) -> list[tuple[Any, ...]]:
         """Scan ``input_value`` for every non-overlapping match, left to right."""
         return [
-            self._convert(match, input_value, 0)
+            self._convert(match, input_value, stripped=False)
             for match in self.pattern.finditer(input_value)
         ]
 
     def _convert(
-        self, match: RE.Match[str], input_value: str, shift: int
+        self, match: RE.Match[str], input_value: str, *, stripped: bool
     ) -> tuple[Any, ...]:
-        """Convert one match's fields; ``shift`` maps offsets to the raw input."""
+        """Convert one match's fields.
+
+        ``stripped`` marks a match that ran against the stripped input; error
+        offsets are then reported against the original input.
+        """
         values: list[Any] = []
-        for index, field in enumerate(self.fields):
-            converter = field.converters[_winner(match, index, field)]
-            raw = match.group(f"s{index}")
+        for index, (field, name, branch_names) in enumerate(
+            zip(self.fields, self._field_names, self._branch_names, strict=True)
+        ):
+            converter = field.converters[_winner(match, index, branch_names)]
+            raw = match.group(name)
             text = raw.strip() if converter.strip else raw
             try:
                 values.append(converter.fn(text))
             except Exception as error:
-                offset = shift + match.start(f"s{index}")
+                offset = match.start(name)
+                if stripped:
+                    offset += len(input_value) - len(input_value.lstrip())
+                label = _label(converter)
                 raise ConvertError(
                     f"cannot convert field {index + 1} ({text!r}) at offset "
-                    f"{offset} using {_label(converter)}"
+                    f"{offset} using {label}",
+                    field=index + 1,
+                    offset=offset,
+                    text=text,
+                    converter=label,
+                    input_value=input_value,
+                    template=self.template,
                 ) from error
         return tuple(values)

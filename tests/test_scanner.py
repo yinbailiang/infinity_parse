@@ -665,3 +665,36 @@ def test_resolve_field_meta_to_converter() -> None:
     assert resolve_field(int, []).converters[0].fn is int
     default = resolve_field(dict, [])
     assert default.converters[0].fn("{}") == {}
+
+
+def test_build_field_results_are_cached() -> None:
+    from infinity_parse.scanner import build_field
+
+    assert build_field(Digits) is build_field(Digits)
+
+
+def test_unhashable_metadata_is_supported() -> None:
+    parsed = scan[Annotated[int, ["ignored-list"]]]("{}")("42")
+    assert parsed == (42,)
+
+
+def test_scan_conversion_error_is_structured() -> None:
+    with pytest.raises(ConvertError) as exc_info:
+        scan[int, int]("{} {}")("1 zz")
+    error = exc_info.value
+    assert error.field == 2
+    assert error.offset == 2
+    assert error.text == "zz"
+    assert error.converter == "int"
+    assert error.input_value == "1 zz"
+    assert error.template == "{} {}"
+
+
+def test_scanner_exposes_the_compiled_pattern() -> None:
+    parse_pair = scan[int, int]("{} {}")
+    pattern = parse_pair.raw_pattern
+    assert isinstance(pattern, re.Pattern)
+    match = pattern.fullmatch("7 8")
+    assert match is not None
+    assert (match.group("s0"), match.group("s1")) == ("7", "8")
+    assert pattern.fullmatch("nope") is None

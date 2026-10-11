@@ -59,6 +59,15 @@ def test_sep_by_uses_a_custom_separator() -> None:
     assert words("a; b") == ["a", "b"]
 
 
+def test_alt_error_exposes_structured_input() -> None:
+    value = alt(scan[int]("x={}"), scan[int]("y={}"))
+    with pytest.raises(MatchError) as exc_info:
+        value("z=1")
+    error = exc_info.value
+    assert error.input_value == "z=1"
+    assert error.template is None
+
+
 def test_split_top_protects_bracketed_separators() -> None:
     split = split_top(",", ("[{", "}]"))
     assert split("a,b[c,d],e") == ["a", "b[c,d]", "e"]

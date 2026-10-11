@@ -80,6 +80,28 @@ parse_name(r'"kim \"the fox\""')  # ('kim "the fox"',)
 parse_name(r'"C:\\path\\to\\file"')  # ('C:\\path\\to\\file',)
 ```
 
+### Capturing Large Blobs
+
+The default `.+?` is lazy — designed for fields followed by an anchor: it expands
+one character at a time to find the shortest match. For a large capture with no
+following anchor (a document body, say) that is expensive on CPython: a 1 MB
+capture measures ~**8 ms**, while an explicit greedy DOTALL pattern takes
+~**1 µs**:
+
+```python
+from typing import Annotated
+
+from infinity_parse import Converter, scan
+
+Blob = Annotated[str, Converter(str, pattern=r"(?s:.+)")]
+parse_doc = scan[Blob]("{}")
+
+parse_doc("arbitrarily large text…")  # near-zero overhead at any size
+```
+
+Do not change the default — shortest-match (lazy) semantics are the heart of
+the template design.
+
 ### Scanners Inside Converters
 
 `Converter.fn` may be another scanner — the outer pattern captures the field, then
@@ -187,6 +209,29 @@ scan[int, int]("{} {}")("1 zz")
 - Offsets in `search` / `findall` are relative to the original input as well (no
   strip compensation applies there).
 - Errors from nested scanners form a `__cause__` chain.
+
+Both errors also expose the same details as structured attributes, so callers can
+consume them programmatically without parsing the message:
+
+| Error | Structured attributes |
+| - | - |
+| `MatchError` | `input_value`, `template` (`None` when unknown) |
+| `ConvertError` | `field`, `offset`, `text`, `converter`, `input_value`, `template` |
+
+```python
+from infinity_parse import ConvertError, scan
+
+try:
+    scan[int, int]("{} {}")("1 zz")
+except ConvertError as error:
+    error.field  # 2
+    error.offset  # 2
+    error.text  # 'zz'
+    error.converter  # 'int'
+```
+
+`MatchError` raised by `alt` carries `input_value` as well (see
+[combinators.md](combinators.md)).
 
 ## Low-Level Construction
 

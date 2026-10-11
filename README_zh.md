@@ -286,7 +286,36 @@ scan[Number]("{}")("42")  # (42,)
 search[Number]("{}")("answer 42")  # (42,)
 scanall[Number]("{}")("1 2 3")  # [(1,), (2,), (3,)]
 ```
+> **默认惰性提示**：裸类型字段保持默认模式 `.+?`，在 `search` 模式下会在第一个能
+> 完成匹配的最短截断处停下——`search[int]("age={}")("age=42")` 得到 `(4,)`。需要
+> 完整 token 时请使用显式 `Converter(pattern=...)` 或精选类型。
 
+## 性能
+
+解析 10 万条日志行（`2024-03-15 12:30:45 GET /api/items 200 1234 5678 0.123`——8 个
+字段：日期、时间、两个单词、三个整数、一个浮点），各库均使用编译后可复用的解析器：
+
+| 库 | 耗时 | 吞吐 | 每行 |
+| - | - | - | - |
+| **infinity_parse** | ~0.41 s | ~240k 行/s | ~4.2 µs |
+| infinity_parse（仅匹配）¹ | ~0.06 s | ~1.7M 行/s | ~0.59 µs |
+| temparse | ~1.08 s | ~92k 行/s | ~10.8 µs |
+| parse | ~1.57 s | ~64k 行/s | ~15.7 µs |
+| parse（仅匹配）¹ | ~0.08 s | ~1.3M 行/s | ~0.77 µs |
+
+¹ 两组「仅匹配」均为不转换字段的下限：infinity_parse 用 `Scanner.raw_pattern`，
+`parse` 用 `evaluate_result=False`；与其它行口径不同。
+
+在该负载下约为 **temparse 的 2.6 倍、`parse` 的 3.8 倍**；两者「仅匹配」的速度
+接近（~0.59 µs vs ~0.77 µs），差距来自转换环节：infinity_parse 转换并返回字段
+后总计约 4.2 µs，而 `parse` 的 ~15.7 µs 大多花在字段转换与富 `Result` 对象上。
+
+> 单机实测（3 轮取最优），CPython 3.14、Linux x86_64：infinity_parse 为本仓库当前
+> 代码（2026-10），parse 1.22.3、temparse 1.0.0。微基准受环境影响较大，请以自己的
+> 实际负载为准。
+>
+> 复现：`uv run --extra benchmark python benchmarks/compare.py`（脚本在
+> [`benchmarks/`](benchmarks/) 目录）。
 ## 文档
 
 完整双语文档（中文 / English）位于 [`docs/`](docs/)，并发布在

@@ -287,6 +287,10 @@ version = "1.1.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
+benchmark = [
+    { name = "parse" },
+    { name = "temparse" },
+]
 dev = [
     { name = "interrogate" },
     { name = "pre-commit" },
@@ -310,13 +314,15 @@ requires-dist = [
     { name = "interrogate", marker = "extra == 'dev'" },
     { name = "mkdocs-material", marker = "extra == 'docs'" },
     { name = "mkdocs-static-i18n", marker = "extra == 'docs'" },
+    { name = "parse", marker = "extra == 'benchmark'" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pyright", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "ruff", marker = "extra == 'dev'" },
+    { name = "temparse", marker = "extra == 'benchmark'" },
 ]
-provides-extras = ["test", "docs", "dev"]
+provides-extras = ["test", "docs", "benchmark", "dev"]
 
 [[package]]
 name = "iniconfig"
@@ -560,6 +566,15 @@ wheels = [
 ]
 
 [[package]]
+name = "parse"
+version = "1.22.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/47/3d816e5e8f65b17667a4fcc672806d9ecf3dd997691d56ae5345a445b653/parse-1.22.3.tar.gz", hash = "sha256:7e79bb39c72c3bf1613510fd5cdffe5baa9a7873892bef1d4566f1672c8a42f4", size = 37944, upload-time = "2026-10-10T17:29:41.029Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/07/5c578992b965e9c5101c7ad377440ca250769b34542a1781ab06b25c56fc/parse-1.22.3-py2.py3-none-any.whl", hash = "sha256:2cd33a301b5a4b400ee79952f42364fe486e5f10701fbf819fbbab1eab478139", size = 21221, upload-time = "2026-10-10T17:29:39.676Z" },
+]
+
+[[package]]
 name = "pathspec"
 version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -794,6 +809,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/58/8c37dea7bbf769b20d58e7ace7e5edfe65b849442b00ffcdd56be88697c6/tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d", size = 91754, upload-time = "2026-03-04T18:55:34.402Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3", size = 39814, upload-time = "2026-03-04T18:55:31.284Z" },
+]
+
+[[package]]
+name = "temparse"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/36/e4/457c9a981b734d0bc7a70a5a0f84b0e5abdb4583d421d47e8e019cd6c8df/temparse-1.0.0.tar.gz", hash = "sha256:9215629129db3ef9f9cef33a576185fd26c36026d57ab765e9a191a49ab34982", size = 3099, upload-time = "2026-07-18T06:19:44.73Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f5/0e/3674411a71618a9fb0344da76a04aadd797b27c94589aa70f733f427c261/temparse-1.0.0-py3-none-any.whl", hash = "sha256:44b34b79bd1a68caf8c29cee0e7ff1756311b3cf98570db1b6b5efae6505e9ae", size = 4044, upload-time = "2026-07-18T06:19:43.858Z" },
 ]
 
 [[package]]

@@ -31,6 +31,10 @@ a, b, c = scan[int, float, str]("{} {} {}")("1 2.5 hello")
 | `search(input_value)` | `search[...]` | 无匹配返回 `None` |
 | `findall(input_value)` | `scanall[...]` | 无匹配返回空列表 |
 
+`Scanner` 还暴露 `raw_pattern` 属性——模板编译后的底层正则（每个 `{}` 一个命名
+分组：`s0`、`s1`…），适合「只匹配、不转换」的场景（如与
+`parse(evaluate_result=False)` 对齐口径的基准对比）。
+
 ### 签名
 
 ```python
@@ -38,6 +42,9 @@ class Scanner[*Meta]:
     def fullmatch(self, input_value: str) -> tuple[*Meta]
     def search(self, input_value: str) -> tuple[*Meta] | None
     def findall(self, input_value: str) -> list[tuple[*Meta]]
+
+    @property
+    def raw_pattern(self) -> re.Pattern[str]  # 编译后的模板正则
 
 class scan[*Meta](Scanner[*Meta]):
     def __call__(self, input_value: str) -> tuple[*Meta]
@@ -72,6 +79,9 @@ search[Number]("{}")("nothing")  # None
 - `search` / `scanall`：对原始输入扫描（不 strip 外层空白）。
 - 三种模式下，转换器失败都以 `ConvertError` 中止——`search` / `scanall` 不会跳过
   失败项去尝试后面的匹配。
+- `search` 只要求存在匹配：裸类型（默认惰性 `.+?`）会在第一个成功的截断处停下——
+  `search[int]("age={}")("age=42")` 得到 `(4,)`；需要完整形态时改用带 `pattern`
+  的 `Converter` 或精选类型。
 
 ---
 

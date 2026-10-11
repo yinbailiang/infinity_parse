@@ -75,6 +75,37 @@ def test_engine_distinguishes_match_and_convert_failures() -> None:
     assert isinstance(exc_info.value.__cause__, ValueError)
 
 
+def test_engine_match_error_exposes_input_and_template() -> None:
+    with pytest.raises(MatchError) as exc_info:
+        Template("x", ()).fullmatch("y")
+    error = exc_info.value
+    assert error.input_value == "y"
+    assert error.template == "x"
+
+
+def test_engine_convert_error_exposes_structured_details() -> None:
+    template = Template("x={}", (_field(int, pattern=r"\w+", name="int"),))
+    with pytest.raises(ConvertError) as exc_info:
+        template.fullmatch("x=abc")
+    error = exc_info.value
+    assert error.field == 1
+    assert error.offset == 2
+    assert error.text == "abc"
+    assert error.converter == "int"
+    assert error.input_value == "x=abc"
+    assert error.template == "x={}"
+
+
+def test_engine_convert_error_offset_maps_to_original_input() -> None:
+    template = Template("x={}", (_field(int, pattern=r"\w+", name="int"),))
+    with pytest.raises(ConvertError) as exc_info:
+        template.fullmatch("  x=abc")
+    error = exc_info.value
+    assert error.offset == 4
+    assert error.text == "abc"
+    assert "at offset 4" in str(error)
+
+
 def test_engine_branches_compete_in_declaration_order() -> None:
     field = Field(
         converters=(

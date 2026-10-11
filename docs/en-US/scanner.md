@@ -32,6 +32,10 @@ a, b, c = scan[int, float, str]("{} {} {}")("1 2.5 hello")
 | `search(input_value)` | `search[...]` | Returns `None` when there is no match |
 | `findall(input_value)` | `scanall[...]` | Returns an empty list when there is no match |
 
+`Scanner` also exposes `raw_pattern` — the compiled template regex (one named
+group per `{}` field: `s0`, `s1`, …) for match-only use without field conversion
+(the benchmark's counterpart to `parse(evaluate_result=False)`).
+
 ### Signatures
 
 ```python
@@ -39,6 +43,9 @@ class Scanner[*Meta]:
     def fullmatch(self, input_value: str) -> tuple[*Meta]
     def search(self, input_value: str) -> tuple[*Meta] | None
     def findall(self, input_value: str) -> list[tuple[*Meta]]
+
+    @property
+    def raw_pattern(self) -> re.Pattern[str]  # compiled template regex
 
 class scan[*Meta](Scanner[*Meta]):
     def __call__(self, input_value: str) -> tuple[*Meta]
@@ -74,6 +81,10 @@ search[Number]("{}")("nothing")  # None
 - `search` / `scanall` scan the raw input (no outer strip).
 - In all three modes a converter failure aborts with `ConvertError` — `search` /
   `scanall` never skip a failing match to try a later one.
+- `search` only requires *a* match: with a bare type (default lazy `.+?`) the
+  field stops at the first truncation that completes the pattern —
+  `search[int]("age={}")("age=42")` returns `(4,)`. Use a `Converter` with an
+  explicit `pattern`, or a curated type, when the full token matters.
 
 ---
 

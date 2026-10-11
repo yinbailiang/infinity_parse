@@ -303,7 +303,45 @@ Number = Annotated[int, Converter(int, pattern=r"\d+")]
 scan[Number]("{}")("42")  # (42,)
 search[Number]("{}")("answer 42")  # (42,)
 scanall[Number]("{}")("1 2 3")  # [(1,), (2,), (3,)]
-```## Documentation
+```
+
+> **Default-lazy note**: a bare type keeps the default `.+?` field pattern, so in
+> `search` mode the field stops at the shortest text that completes the pattern —
+> `search[int]("age={}")("age=42")` returns `(4,)`. Reach for an explicit
+> `Converter(pattern=...)` or a curated type when the full token matters.
+
+## Performance
+
+Parsing 100,000 log lines (`2024-03-15 12:30:45 GET /api/items 200 1234 5678 0.123`
+— 8 fields: date, time, two words, three ints, one float), each library using its
+compiled, reusable parser:
+
+| Library | Time | Throughput | Per row |
+| - | - | - | - |
+| **infinity_parse** | ~0.41 s | ~240k rows/s | ~4.2 µs |
+| infinity_parse (match only)¹ | ~0.06 s | ~1.7M rows/s | ~0.59 µs |
+| temparse | ~1.08 s | ~92k rows/s | ~10.8 µs |
+| parse | ~1.57 s | ~64k rows/s | ~15.7 µs |
+| parse (match only)¹ | ~0.08 s | ~1.3M rows/s | ~0.77 µs |
+
+¹ Match-only lower bounds (no field conversion): `Scanner.raw_pattern` for
+infinity_parse and `evaluate_result=False` for `parse` — not like-for-like
+results.
+
+That is about **2.6× faster than temparse and 3.8× faster than `parse`** on this
+workload. Raw matching costs about the same for both (~0.59 µs vs ~0.77 µs); the
+rest of infinity_parse's ~4.2 µs goes into conversion, while most of `parse`'s
+~15.7 µs goes into conversion and its rich `Result` object.
+
+> Single-machine measurement (best of 3 runs) on CPython 3.14, Linux x86_64:
+> infinity_parse from this repository (Oct 2026), parse 1.22.3, temparse 1.0.0.
+> Micro-benchmarks are environment sensitive — measure your own workload before
+> drawing conclusions.
+>
+> Reproduce with `uv run --extra benchmark python benchmarks/compare.py`
+> (scripts live in [`benchmarks/`](benchmarks/)).
+
+## Documentation
 
 Full bilingual documentation (English / 中文) lives in [`docs/`](docs/) and is
 published at <https://yinbailiang.github.io/infinity_parse/>.

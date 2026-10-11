@@ -38,6 +38,10 @@ docs = [
     "mkdocs-material",
     "mkdocs-static-i18n",
 ]
+benchmark = [
+    "parse",
+    "temparse",
+]
 dev = [
     "interrogate",
     "ruff",
@@ -85,6 +89,8 @@ typeCheckingMode = "strict"
 pythonVersion = "3.14"
 venvPath = "."
 venv = ".venv"
+# benchmark 脚本依赖可选的第三方解析库（benchmark extra），默认环境不安装。
+exclude = ["**/node_modules", "**/__pycache__", "**/.*", ".venv", "benchmarks"]
 
 [tool.interrogate]
 fail-under = 90
