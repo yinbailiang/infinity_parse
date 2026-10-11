@@ -3,6 +3,8 @@
 Type-safe, `scanf`-style string parsing for Python 3.14+.
 Distributed and imported as `infinity_parse`.
 
+> 📖 [中文版](README_zh.md) · 🌐 [Documentation site](https://yinbailiang.github.io/infinity_parse/)
+
 Supply one converter type per `{}` placeholder as class type arguments, then
 the template and the input string as call arguments:
 
@@ -301,7 +303,18 @@ Number = Annotated[int, Converter(int, pattern=r"\d+")]
 scan[Number]("{}")("42")  # (42,)
 search[Number]("{}")("answer 42")  # (42,)
 scanall[Number]("{}")("1 2 3")  # [(1,), (2,), (3,)]
-```
+```## Documentation
+
+Full bilingual documentation (English / 中文) lives in [`docs/`](docs/) and is
+published at <https://yinbailiang.github.io/infinity_parse/>.
+
+| Document | Contents |
+| - | - |
+| [Core Overview](docs/en-US/infinity_parse.md) | Scan flow and component map |
+| [Scanner](docs/en-US/scanner.md) | Entry points, matching modes, template syntax, field declarations |
+| [Engine](docs/en-US/engine.md) | `Converter` configuration, `Template`, error model |
+| [Curated Types](docs/en-US/parse_types.md) | The shipped `parse_types` catalog |
+| [Combinators](docs/en-US/combinators.md) | Composing scanners into larger parsers |
 
 ## Development
 
@@ -330,4 +343,8 @@ with the metas riding in PEP 695 `type` aliases.
 
 ## License
 
-MIT. See [`LICENSE.md`](LICENSE.md).
+[MIT](LICENSE.md)
+
+## Part of InfinitySystem
+
+![icon](docs/res/infinity_icon/256x256.png)

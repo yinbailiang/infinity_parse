@@ -12,6 +12,9 @@ wheels/
 # Tooling caches
 .ruff_cache/
 
+# mkdocs
+site/
+
 # pytest
 .pytest_cache/
 .coverage

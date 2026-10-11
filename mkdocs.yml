@@ -1,0 +1,82 @@
+site_name: InfinityParse
+site_url: https://yinbailiang.github.io/infinity_parse/
+site_description: 强类型、scanf 风格的字符串解析库 —— 模板 + 转换器 + 组合子
+repo_url: https://github.com/yinbailiang/infinity_parse
+repo_name: yinbailiang/infinity_parse
+edit_uri: edit/main/docs/
+copyright: MIT License
+
+theme:
+  name: material
+  logo: res/infinity_icon_simple/128x128.png
+  favicon: res/infinity_icon_simple/32x32.png
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search:
+      lang: [en, zh]
+  - i18n:
+      docs_structure: folder
+      languages:
+        - locale: zh-CN
+          default: true
+          name: 中文
+          theme:
+            language: zh
+          nav_translations:
+            Home: 首页
+            Core: 核心
+            Overview: 总览
+            Scanner: 扫描器
+            Engine: 引擎
+            'Curated Types': 精选类型
+            Combinators: 组合子
+        - locale: en-US
+          name: English
+          theme:
+            language: en
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Core:
+      - Overview: infinity_parse.md
+      - Scanner: scanner.md
+      - Engine: engine.md
+      - 'Curated Types': parse_types.md
+      - Combinators: combinators.md

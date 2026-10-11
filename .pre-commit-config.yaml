@@ -5,6 +5,9 @@ repos:
       - id: check-ast
       - id: check-toml
       - id: check-yaml
+        # mkdocs.yml 使用 !!python/name: 标签声明 mermaid 代码块格式，
+        # 会被 safe loader 拒绝；该文件由 mkdocs build 负责校验。
+        exclude: '^mkdocs\.yml$'
       - id: check-json
       - id: check-merge-conflict
       - id: check-case-conflict
