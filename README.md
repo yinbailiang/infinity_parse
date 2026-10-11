@@ -333,6 +333,11 @@ workload. Raw matching costs about the same for both (~0.59 µs vs ~0.77 µs); t
 rest of infinity_parse's ~4.2 µs goes into conversion, while most of `parse`'s
 ~15.7 µs goes into conversion and its rich `Result` object.
 
+The speedup comes from execution strategy, not from missing functionality — the
+benchmark verifies that all three libraries return identical values for the same
+workload, and the functional surface (custom converters, per-field patterns,
+reusable parsers, curated types, search/scan-all modes) stays intact.
+
 > Single-machine measurement (best of 3 runs) on CPython 3.14, Linux x86_64:
 > infinity_parse 1.2.0, parse 1.22.3, temparse 1.0.0. Micro-benchmarks are
 > environment sensitive — measure your own workload before drawing conclusions.
