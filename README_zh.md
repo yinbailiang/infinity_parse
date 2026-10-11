@@ -310,9 +310,8 @@ scanall[Number]("{}")("1 2 3")  # [(1,), (2,), (3,)]
 接近（~0.59 µs vs ~0.77 µs），差距来自转换环节：infinity_parse 转换并返回字段
 后总计约 4.2 µs，而 `parse` 的 ~15.7 µs 大多花在字段转换与富 `Result` 对象上。
 
-> 单机实测（3 轮取最优），CPython 3.14、Linux x86_64：infinity_parse 为本仓库当前
-> 代码（2026-10），parse 1.22.3、temparse 1.0.0。微基准受环境影响较大，请以自己的
-> 实际负载为准。
+> 单机实测（3 轮取最优），CPython 3.14、Linux x86_64：infinity_parse 1.2.0、
+> parse 1.22.3、temparse 1.0.0。微基准受环境影响较大，请以自己的实际负载为准。
 >
 > 复现：`uv run --extra benchmark python benchmarks/compare.py`（脚本在
 > [`benchmarks/`](benchmarks/) 目录）。

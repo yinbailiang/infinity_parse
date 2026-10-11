@@ -334,9 +334,8 @@ rest of infinity_parse's ~4.2 µs goes into conversion, while most of `parse`'s
 ~15.7 µs goes into conversion and its rich `Result` object.
 
 > Single-machine measurement (best of 3 runs) on CPython 3.14, Linux x86_64:
-> infinity_parse from this repository (Oct 2026), parse 1.22.3, temparse 1.0.0.
-> Micro-benchmarks are environment sensitive — measure your own workload before
-> drawing conclusions.
+> infinity_parse 1.2.0, parse 1.22.3, temparse 1.0.0. Micro-benchmarks are
+> environment sensitive — measure your own workload before drawing conclusions.
 >
 > Reproduce with `uv run --extra benchmark python benchmarks/compare.py`
 > (scripts live in [`benchmarks/`](benchmarks/)).
