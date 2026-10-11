@@ -282,6 +282,15 @@ wheels = [
 ]
 
 [[package]]
+name = "infinity-agent-kit"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/82/d1ad00a4c021a61180dae48806d600090aa652037fab985333a26f4e2714/infinity_agent_kit-1.0.0.tar.gz", hash = "sha256:f6e1b7a2f66bcb0472b22148ac8f374657bcb22cbfa541f674d6bad1be1edbb3", size = 24740, upload-time = "2026-10-11T15:00:28.37Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/28/e1/0a26fee6fd241d96ff293243736cda2da192129e1ae51b29c7a6e10f2ac9/infinity_agent_kit-1.0.0-py3-none-any.whl", hash = "sha256:946f409699c91b023b3a5297d656c4baf0d6f8078cbf87e4452f7f4d7c1a5c69", size = 32816, upload-time = "2026-10-11T15:00:27.461Z" },
+]
+
+[[package]]
 name = "infinity-parse"
 version = "1.2.0"
 source = { editable = "." }
@@ -292,6 +301,7 @@ benchmark = [
     { name = "temparse" },
 ]
 dev = [
+    { name = "infinity-agent-kit" },
     { name = "interrogate" },
     { name = "pre-commit" },
     { name = "pyright" },
@@ -310,6 +320,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "infinity-agent-kit", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "infinity-parse", extras = ["test"], marker = "extra == 'dev'" },
     { name = "interrogate", marker = "extra == 'dev'" },
     { name = "mkdocs-material", marker = "extra == 'docs'" },

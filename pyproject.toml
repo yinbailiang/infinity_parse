@@ -48,6 +48,7 @@ dev = [
     "pyright",
     "pre-commit",
     "infinity_parse[test]",
+    "infinity-agent-kit>=1.0.0",
 ]
 
 [project.urls]

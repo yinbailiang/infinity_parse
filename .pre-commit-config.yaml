@@ -75,3 +75,12 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+      # 防漂移：AGENT.md 与 .agents/ 为模板渲染产物，必须与模板保持一致。
+      # 检测到漂移时先运行 `uv run agent-kit update`，再重新提交。
+      - id: agent-kit-check
+        name: agent-kit drift check
+        entry: uv run agent-kit update --check
+        language: system
+        pass_filenames: false
+        always_run: true
